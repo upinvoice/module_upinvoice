@@ -531,7 +531,7 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
 
         // Quantity
         print '<td class="center">';
-        print '<input type="text" size="5" name="line_qty_'.$line_count.'" value="'.price(isset($line['qty']) ? $line['qty'] : 1).'" class="flat qtyline right" onchange="updateLineTotals('.$line_count.')">';
+        print '<input type="text" size="5" name="line_qty_'.$line_count.'" value="'.(isset($line['qty']) ? $line['qty'] : 1).'" class="flat qtyline right" onchange="updateLineTotals('.$line_count.')">';
         print '</td>';
 
         // Unit price

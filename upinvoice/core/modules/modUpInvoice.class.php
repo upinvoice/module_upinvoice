@@ -1,4 +1,5 @@
 <?php
+
 /* Copyright (C) 2023
  * Licensed under the GNU General Public License version 3
  */
@@ -26,7 +27,7 @@ class modUpInvoice extends DolibarrModules
 
         $this->db = $db;
         $this->numero = 500000;  // Unique module number
-        
+
         $this->family = "financial";
         $this->module_position = 500;
         $this->name = preg_replace('/^mod/i', '', get_class($this));
@@ -37,7 +38,7 @@ class modUpInvoice extends DolibarrModules
         $this->version = '1.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';
-        
+
         // Dependencies
         $this->depends = array('modFournisseur', 'modFacture');
         $this->requiredby = array();
@@ -45,7 +46,7 @@ class modUpInvoice extends DolibarrModules
         $this->phpmin = array(7, 0);
         $this->need_dolibarr_version = array(11, 0);
         $this->langfiles = array("upinvoice@upinvoice");
-        
+
         // Constants
         $this->const = array(
             0 => array(
@@ -70,27 +71,27 @@ class modUpInvoice extends DolibarrModules
 
         // Config page
         $this->config_page_url = array("setup.php@upinvoice");
-        
+
         // Tabs
         $this->tabs = array();
-        
+
         // Directories for module
         $this->dirs = array(
-            '/upinvoice/temp'
+            DOL_DATA_ROOT . '/upinvoice/temp'
         );
-        
+
         // Document access configuration
         $this->module_parts = array(
             'dir' => array('output' => 'upinvoice'),
             'modulepart' => array('upinvoice' => 'upinvoice')
         );
 
-		$this->picto = 'upinvoice@upinvoice';
-        
+        $this->picto = 'upinvoice@upinvoice';
+
         // Menus
         $this->menu = array();
         $r = 0;
-        
+
         // Top menu entry
         $this->menu[$r] = array(
             'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=suppliers_bills',
@@ -155,23 +156,23 @@ class modUpInvoice extends DolibarrModules
     public function init($options = '')
     {
         global $conf;
-        
+
         $sql = array();
-        
+
         $result = $this->_load_tables('/upinvoice/sql/');
-        
+
         // Create temp directory if it does not exist
         $tempdir = DOL_DATA_ROOT . '/upinvoice/temp';
         if (!is_dir($tempdir)) {
             dol_mkdir($tempdir);
         }
-        
+
         // Create symbolic link for documents
         $docdir = DOL_DOCUMENT_ROOT . '/upinvoice';
         if (!is_link($docdir)) {
             @symlink(DOL_DATA_ROOT . '/upinvoice', $docdir);
         }
-        
+
         return $this->_init($sql, $options);
     }
 
@@ -184,13 +185,13 @@ class modUpInvoice extends DolibarrModules
     public function remove($options = '')
     {
         $sql = array();
-        
+
         // Remove symbolic link for documents
         $docdir = DOL_DOCUMENT_ROOT . '/upinvoice';
         if (is_link($docdir)) {
             @unlink($docdir);
         }
-        
+
         return $this->_remove($sql, $options);
     }
 }
