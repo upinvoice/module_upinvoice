@@ -1695,15 +1695,9 @@ input.totalttcline {
     margin-bottom: 30px;
 }
 
-.upinvoiceimport-search-form {
-}
-
 .upinvoiceimport-search-input {
     flex: 1;
     margin-right: 10px;
-}
-
-.upinvoiceimport-search-results {
 }
 
 .upinvoiceimport-files-container table.noborder td.right {
@@ -1714,6 +1708,15 @@ input.totalttcline {
     min-height: auto;
     border: 0;
     box-shadow: none;
+}
+.upinvoiceimport-files-container #pending-files-list > .info-box {
+    position: relative;
+    margin-top: -36px;
+    display: block;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    width: 200px;
 }
 
 /* Estilos para vista tabular de archivos finalizados */

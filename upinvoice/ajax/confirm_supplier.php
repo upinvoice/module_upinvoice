@@ -3,10 +3,10 @@
  * Licensed under the GNU General Public License version 3
  */
 if (!defined('NOCSRFCHECK')) {
-    define('NOCSRFCHECK', '1'); // Disable CSRF check for this script
+    define('NOCSRFCHECK', '1');
 }
 if (!defined('NOTOKENRENEWAL')) {
-    define('NOTOKENRENEWAL', '1'); // Disables token renewal
+    define('NOTOKENRENEWAL', '1');
 }
 if (!defined('NOREQUIREMENU')) {
     define('NOREQUIREMENU', '1');
@@ -62,11 +62,12 @@ if (!$user->rights->facture->lire) {
 }
 
 // Security check
-if (!isset($_POST['token'])) {
+if (empty($_POST['token'])) {
     $result = array('status' => 'error', 'message' => $langs->trans('InvalidRequest'));
     echo json_encode($result);
     exit;
 }
+
 
 // Get parameters
 $token = GETPOST('token', 'alpha');

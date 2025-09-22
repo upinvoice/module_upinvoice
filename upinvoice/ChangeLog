@@ -1,0 +1,16 @@
+1.1.0 (2024-09-22)
+- Fix: qty number type, upload folder, payment method autoselect
+- Check tva ids (intra, siren, siret,..)
+- Updates and translations
+- Langs and fix file viewer for file names with '#' chars
+- Fix translations on ajax files and CSRF check problems
+- Fix for reinstall
+- Alert if not api key
+- Update README.md improvements
+
+1.0.0 (2024-03-29)
+- Initial release
+- Module for supplier invoice import using UpInvoice API REST
+- Three-step process: upload, validate supplier, validate invoice
+- Multi-language support (EN, ES, FR, DE, IT)
+- Integration with Dolibarr supplier and invoice modules

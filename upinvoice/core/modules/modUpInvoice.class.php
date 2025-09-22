@@ -26,7 +26,7 @@ class modUpInvoice extends DolibarrModules
         global $langs, $conf;
 
         $this->db = $db;
-        $this->numero = 500000;  // Unique module number
+        $this->numero = 173361;
 
         $this->family = "financial";
         $this->module_position = 500;
@@ -35,7 +35,7 @@ class modUpInvoice extends DolibarrModules
         $this->descriptionlong = "This module allows to upload, validate and register supplier invoices in a three steps process";
         $this->editor_name = "UpInvoice.eu";
         $this->editor_url = "";
-        $this->version = '1.0';
+        $this->version = '1.1';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';
 

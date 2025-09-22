@@ -138,7 +138,7 @@ var UpInvoiceProductSelector = {
                     product.ref,
                     product.label,
                     product.description,
-                    product.price.replace(/[^\d.-]/g, ''),
+                    product.price.replace(/[^0-9,-]/g, '').replace(',', '.'),
                     product.tva_tx,
                     product.type
                 );
