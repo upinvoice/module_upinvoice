@@ -220,6 +220,7 @@ if ($action == 'create_invoice') {
             'qty' => price2num(GETPOST('line_qty_'.$i, 'alpha')),
             'pu_ht' => price2num(GETPOST('line_pu_ht_'.$i, 'alpha')),
             'tva_tx' => price2num(GETPOST('line_tva_tx_'.$i, 'alpha')),
+            'remise_percent' => price2num(GETPOST('line_remise_percent_'.$i, 'alpha')),
             'total_ht' => price2num(GETPOST('line_total_ht_'.$i, 'alpha')),
             'total_tva' => price2num(GETPOST('line_total_tva_'.$i, 'alpha')),
             'total_ttc' => price2num(GETPOST('line_total_ttc_'.$i, 'alpha')),
@@ -449,6 +450,7 @@ print '<th class="linecoldescription minwidth300imp">' . $langs->trans("Descript
 print '<th class="center">' . $langs->trans("VAT") . '</th>';
 print '<th class="center">' . $langs->trans("Qty") . '</th>';
 print '<th class="center">' . $langs->trans("PriceUHT") . '</th>';
+print '<th class="center">' . $langs->trans("Discount") . '</th>';
 print '<th class="right">' . $langs->trans("TotalHT") . '</th>';
 print '<th class="right">' . $langs->trans("TotalVAT") . '</th>';
 print '<th class="right">' . $langs->trans("TotalTTC") . '</th>';
@@ -539,6 +541,11 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
         print '<input type="text" size="8" name="line_pu_ht_'.$line_count.'" value="'.price(isset($line['pu_ht']) ? $line['pu_ht'] : 0).'" class="flat puhline right" onchange="updateLineTotals('.$line_count.')">';
         print '</td>';
 
+        // Discount
+        print '<td class="center">';
+        print '<input type="text" size="5" name="line_remise_percent_'.$line_count.'" value="'.price(isset($line['remise_percent']) ? $line['remise_percent'] : 0).'" class="flat remisepercentline right" onchange="updateLineTotals('.$line_count.')">';
+        print '</td>';
+
         // Total HT
         print '<td class="right">';
         print '<input type="text" size="8" name="line_total_ht_'.$line_count.'" value="'.price(isset($line['total_ht']) ? $line['total_ht'] : 0).'" class="flat totalhtline right" readonly>';
@@ -591,6 +598,8 @@ print '</div>';
 print '<input type="hidden" id="validate_invoice" name="validate_invoice" value="0">';
 
 print '</form>';
+
+print '<input type="hidden" id="max_input_vars" value="'.ini_get('max_input_vars').'">';
 
 // Close container
 print '</div>';
@@ -659,22 +668,68 @@ $(document).ready(function() {
     
     // Calculate initial invoice totals based on loaded data
     updateInvoiceTotals();
+    max_input_vars_check();
 
     // Manage "Create Invoice" button (without validating)
     $("input[name='create_only']").click(function() {
         // Ensure validate_invoice field is 0
         $('#validate_invoice').val('0');
         // No return false needed, let the form submit
+        max_input_vars_check();
     });
 });
 
+function max_input_vars_check() {
+    var maxInputVars = parseInt($('#max_input_vars').val());
+    var inputcount = $('form#invoice_form :input').length;
+    // Estimate total input vars: each line has ~9 inputs + other form inputs (~20)
+    var estimatedTotalInputs = inputcount;
+    if (estimatedTotalInputs >= maxInputVars) {
+        alert('Warning: The number of input fields (' + estimatedTotalInputs + ') exceeds or is close to the PHP max_input_vars limit (' + maxInputVars + '). Please reduce the number of lines or increase the max_input_vars setting in your PHP configuration to avoid data loss.');
+    }
+    return false;
+}
+
+function parseLocalizedFloat(value) {
+    if (typeof value !== 'string') return parseFloat(value) || 0;
+
+    value = value.trim();
+
+    // Elimina los espacios
+    value = value.replace(/\s+/g, '');
+
+    // Detecta si el separador decimal es una coma o un punto
+    // (si hay coma y punto, el que va más a la derecha es el decimal)
+    const hasComma = value.includes(',');
+    const hasDot = value.includes('.');
+
+    if (hasComma && hasDot) {
+        if (value.lastIndexOf(',') > value.lastIndexOf('.')) {
+            // "3.000,50" → eliminar puntos, reemplazar coma por punto
+            value = value.replace(/\./g, '').replace(',', '.');
+        } else {
+            // "3,000.50" → eliminar comas (miles)
+            value = value.replace(/,/g, '');
+        }
+    } else if (hasComma) {
+        // "3000,50" o "3 000,50" → reemplazar coma por punto
+        value = value.replace(',', '.');
+    } else {
+        // "3.000" o "3 000" sin coma decimal → eliminar separadores de miles
+        value = value.replace(/\.(?=\d{3}($|[^\d]))/g, '');
+    }
+
+    return parseFloat(value) || 0;
+}
+
 // Update line totals
 function updateLineTotals(lineNum) {
-    var qty = parseFloat($("input[name='line_qty_" + lineNum + "']").val().replace(/,/g, '.')) || 0;
-    var pu_ht = parseFloat($("input[name='line_pu_ht_" + lineNum + "']").val().replace(/,/g, '.')) || 0;
-    var tva_tx = parseFloat($("input[name='line_tva_tx_" + lineNum + "']").val().replace(/,/g, '.')) || 0;
-    
-    var total_ht = qty * pu_ht;
+    var qty = parseLocalizedFloat($("input[name='line_qty_" + lineNum + "']").val()) || 0;
+    var pu_ht = parseLocalizedFloat($("input[name='line_pu_ht_" + lineNum + "']").val()) || 0;
+    var tva_tx = parseLocalizedFloat($("input[name='line_tva_tx_" + lineNum + "']").val()) || 0;
+    var remise_percent = parseLocalizedFloat($("input[name='line_remise_percent_" + lineNum + "']").val()) || 0;
+
+    var total_ht = qty * pu_ht * (1 - remise_percent / 100);
     var total_tva = total_ht * (tva_tx / 100);
     var total_ttc = total_ht + total_tva;
     
@@ -742,6 +797,7 @@ function addNewLine() {
         '<td class="center"><input type="text" size="5" name="line_tva_tx_' + lineCount + '" value="' + defaultVat + '" class="flat tvaline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="center"><input type="text" size="5" name="line_qty_' + lineCount + '" value="1" class="flat qtyline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="center"><input type="text" size="8" name="line_pu_ht_' + lineCount + '" value="0" class="flat puhline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
+        '<td class="center"><input type="text" size="5" name="line_remise_percent_' + lineCount + '" value="" class="flat remisepercentline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="right"><input type="text" size="8" name="line_total_ht_' + lineCount + '" value="0" class="flat totalhtline right" readonly></td>' +
         '<td class="right"><input type="text" size="8" name="line_total_tva_' + lineCount + '" value="0" class="flat totalvaline right" readonly></td>' +
         '<td class="right"><input type="text" size="8" name="line_total_ttc_' + lineCount + '" value="0" class="flat totalttcline right" readonly></td>' +

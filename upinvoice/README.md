@@ -63,6 +63,12 @@ If the module doesn't appear in the modules list:
 - Verify that the Dolibarr version is compatible
 - Check the Dolibarr logs for any errors
 
+## Support
+
+For support and questions about this module, please contact:
+- Email: info@upinvoice.eu
+- Website: https://upinvoice.eu
+
 ## License
 
 This module is licensed under the GNU General Public License v3.0.

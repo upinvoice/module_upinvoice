@@ -161,6 +161,7 @@ class UpInvoiceInvoice
         $ref_supplier = isset($lineData['ref_supplier']) ? $lineData['ref_supplier'] : '';
         $fk_product = isset($lineData['fk_product']) ? $lineData['fk_product'] : 0;
         $product_type = isset($lineData['product_type']) ? $lineData['product_type'] : 0;
+        $remise_percent = isset($lineData['remise_percent']) ? price2num($lineData['remise_percent']) : 0;
 
         // IMPORTANTE: Asegurarse de tener los valores correctos
         // Si el formulario pasa valores totales en lugar de unitarios, hay que calcular los unitarios
@@ -172,7 +173,7 @@ class UpInvoiceInvoice
         }
         // Si tienes el total pero no el unitario, calcúlalo
         elseif (isset($lineData['total_ht']) && $qty > 0) {
-            $pu_ht = price2num($lineData['total_ht'] / $qty);
+            $pu_ht = price2num($lineData['total_ht'] / $qty / (1 - $remise_percent / 100));
         } else {
             $pu_ht = 0;
         }
@@ -191,7 +192,7 @@ class UpInvoiceInvoice
             0,                   // Localtax2 rate
             $qty,                // Quantity
             $fk_product,         // Product ID
-            0,                   // Remise percent
+            $remise_percent,     // Remise percent
             '',                  // Date start
             '',                  // Date end
             0,                   // Ventil account code
