@@ -1,4 +1,10 @@
-1.1.0 (2024-09-22)
+1.2.0 (2025-11-08)
+- Check max_input_vars PHP configuration to prevent data loss on large invoices
+- Improved amount format handling with better validation and normalization
+- Support for line-level discount percentage in invoice import
+- Enhanced error messages for configuration issues
+
+1.1.0 (2025-09-22)
 - Fix: qty number type, upload folder, payment method autoselect
 - Check tva ids (intra, siren, siret,..)
 - Updates and translations
@@ -8,7 +14,7 @@
 - Alert if not api key
 - Update README.md improvements
 
-1.0.0 (2024-03-29)
+1.0.0 (2025-03-29)
 - Initial release
 - Module for supplier invoice import using UpInvoice API REST
 - Three-step process: upload, validate supplier, validate invoice
