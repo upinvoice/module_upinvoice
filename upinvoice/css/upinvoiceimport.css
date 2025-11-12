@@ -1572,7 +1572,8 @@ input.totalttcline {
 }
 
 .file-progress {
-    padding: 15px;
+    height: 0;
+    padding: 0 15px;
 }
 
 .file-error {

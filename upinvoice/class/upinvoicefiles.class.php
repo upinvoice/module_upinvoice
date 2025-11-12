@@ -447,6 +447,19 @@ class UpInvoiceFiles extends CommonObject
             }
 
             if ($httpCode != 200) {
+                $jsonResponse = json_decode($response, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    // Log the JSON response
+                    error_log("API returned HTTP code $httpCode: " . print_r($jsonResponse, true));
+                    if (isset($jsonResponse['message'])) {
+                        // Si $jsonResponse['message'] es "Division by zero" mostramos un mensaje de error personalizado: "The IA processing failed, please try again. If the problem persists, contact info@upinvoice.eu"
+                        if ($jsonResponse['message'] === "Division by zero") {
+                            throw new Exception("The IA processing failed, please try again. If the problem persists, contact info@upinvoice.eu");
+                        }
+                        throw new Exception("API returned error: " . $jsonResponse['message']);
+                    }
+                }
+
                 throw new Exception("API returned HTTP code $httpCode: $response");
             }
             
