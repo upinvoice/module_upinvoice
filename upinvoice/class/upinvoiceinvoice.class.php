@@ -98,6 +98,13 @@ class UpInvoiceInvoice
                 throw new Exception($invoice->error);
             }
 
+            // localtax2
+            if (isset($invoiceData['localtax2'])) {
+                $invoice->total_localtax2 = floatval(price2num($invoiceData['localtax2']));
+                $total_ht = floatval(price2num($invoiceData['total_ht']));
+                $invoice->localtax2_tx = ($total_ht > 0) ? ($invoice->total_localtax2 / $total_ht) * 100 : 0;
+            }
+
             // Add invoice lines
             if (!empty($invoiceData['lines']) && is_array($invoiceData['lines'])) {
                 foreach ($invoiceData['lines'] as $line) {
@@ -106,6 +113,8 @@ class UpInvoiceInvoice
                         throw new Exception($langs->trans('ErrorAddingInvoiceLine') . ': ' . $invoice->error);
                     }
                 }
+                // Update invoice totals after all lines are added (to account for manual localtax2 updates)
+                $invoice->update_price(1);
             }
 
             // Validar la factura solo si se solicita explícitamente
@@ -162,6 +171,7 @@ class UpInvoiceInvoice
         $fk_product = isset($lineData['fk_product']) ? $lineData['fk_product'] : 0;
         $product_type = isset($lineData['product_type']) ? $lineData['product_type'] : 0;
         $remise_percent = isset($lineData['remise_percent']) ? price2num($lineData['remise_percent']) : 0;
+        $localtax2_tx = isset($invoice->localtax2_tx) ? $invoice->localtax2_tx : 0;
 
         // IMPORTANTE: Asegurarse de tener los valores correctos
         // Si el formulario pasa valores totales en lugar de unitarios, hay que calcular los unitarios
@@ -184,12 +194,12 @@ class UpInvoiceInvoice
         // Registra para depuración los valores que estás pasando
         dol_syslog("addInvoiceLine: pu_ht=" . $pu_ht . ", qty=" . $qty . ", tva_tx=" . $tva_tx . ", fk_product=" . $fk_product . ", product_type=" . $product_type);
 
-        return $invoice->addline(
+        $line_id = $invoice->addline(
             $desc,               // Description
             $pu_ht,              // Unit price HT (sin impuestos)
             $tva_tx,             // VAT rate
             0,                   // Localtax1 rate
-            0,                   // Localtax2 rate
+            $localtax2_tx,       // Localtax2 rate
             $qty,                // Quantity
             $fk_product,         // Product ID
             $remise_percent,     // Remise percent
@@ -207,6 +217,22 @@ class UpInvoiceInvoice
             0,                   // Precio en divisa
             $ref_supplier        // Ref supplier
         );
+
+        // Fix for localtax2 (IRPF) if set
+        // Dolibarr's addline/calcul_price_total resets localtax2 if it doesn't match the dictionary.
+        // We force it here if we have a custom rate.
+        if ($line_id > 0 && $localtax2_tx != 0) {
+             $lineObj = new SupplierInvoiceLine($this->db);
+             if ($lineObj->fetch($line_id) > 0) {
+                 $lineObj->localtax2_tx = $localtax2_tx;
+                 $lineObj->localtax2_type = '1'; // Type 1 = tax on HT (without VAT)
+                 // Calculate total_localtax2 based on total_ht
+                 $lineObj->total_localtax2 = price2num($lineObj->total_ht * ($localtax2_tx / 100));
+                 $lineObj->update(1);
+             }
+        }
+
+        return $line_id;
     }
 
     /**

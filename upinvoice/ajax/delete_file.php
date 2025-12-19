@@ -91,11 +91,18 @@ if ($res <= 0) {
     exit;
 }
 
-// Check if file is being processed
+// Check if file is being processed (but allow deletion if it's stuck for more than 100 seconds)
 if ($upinvoicefiles->processing == 1) {
-    $result = array('status' => 'error', 'message' => $langs->trans('CannotDeleteProcessingFile'));
-    echo json_encode($result);
-    exit;
+    $timeSinceModification = time() - $upinvoicefiles->date_modification;
+    if ($timeSinceModification <= 100) {
+        // File is actively processing, cannot delete
+        $result = array('status' => 'error', 'message' => $langs->trans('CannotDeleteProcessingFile'));
+        echo json_encode($result);
+        exit;
+    }
+    // If stuck for more than 100 seconds, allow deletion by resetting processing flag first
+    $upinvoicefiles->processing = 0;
+    $upinvoicefiles->update($user);
 }
 
 // Delete file

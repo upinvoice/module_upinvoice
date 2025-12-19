@@ -83,11 +83,19 @@ if ($result <= 0) {
     exit;
 }
 
-// Check if file is already being processed
+// Check if file is already being processed (but allow if it's stuck for more than 100 seconds)
 if ($upinvoicefiles->processing == 1) {
-    $result = array('status' => 'error', 'message' => $langs->trans('FileAlreadyProcessing'));
-    echo json_encode($result);
-    exit;
+    $timeSinceModification = time() - $upinvoicefiles->date_modification;
+    if ($timeSinceModification <= 100) {
+        // File is actively processing, not stuck
+        $result = array('status' => 'error', 'message' => $langs->trans('FileAlreadyProcessing'));
+        echo json_encode($result);
+        exit;
+    }
+    // If stuck for more than 100 seconds, allow retry by setting processing to 0
+    $upinvoicefiles->processing = 0;
+    $upinvoicefiles->status = 0; // Reset to pending
+    $upinvoicefiles->update($user);
 }
 
 // Process the file

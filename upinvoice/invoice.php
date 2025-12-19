@@ -201,6 +201,7 @@ if ($action == 'create_invoice') {
         'total_ht' => price2num(GETPOST('total_ht', 'alpha')),
         'total_tva' => price2num(GETPOST('total_tva', 'alpha')),
         'total_ttc' => price2num(GETPOST('total_ttc', 'alpha')),
+        'localtax2' => price2num(GETPOST('localtax2', 'alpha')), // IRPF / Retención
         'lines' => array(),
         'validate' => $validate_invoice // Pass validation flag to creation function
     );
@@ -422,6 +423,21 @@ print '<td class="right">';
 print '<input type="text" name="total_tva" id="total_tva" class="flat right" value="'.price($invoice_data['total_tva'] ?? 0).'">';
 print '</td>';
 print '</tr>';
+
+// --- START: LocalTax2 (IRPF/Retención) ---
+// Se muestra si viene en el JSON o si el usuario quiere añadirlo manualmente
+$val_localtax2 = isset($invoice_data['localtax2']) ? $invoice_data['localtax2'] : 0;
+if ($val_localtax2 !== 0) {
+    print '<tr>';
+    // Usamos TotalLT2 que suele corresponder a IRPF en configuraciones ES, o un texto genérico
+    print '<td>' . $langs->trans("Retencion") . '</td>';
+    print '<td class="right">';
+    // Importante: onchange para recalcular totales
+    print '<input type="text" name="localtax2" id="localtax2" class="flat right" value="'.price($val_localtax2).'" onchange="updateInvoiceTotals()">';
+    print '</td>';
+    print '</tr>';
+}
+// --- END: LocalTax2 ---
 
 // Total TTC
 print '<tr class="liste_titre">';
@@ -715,8 +731,13 @@ function parseLocalizedFloat(value) {
         // "3000,50" o "3 000,50" → reemplazar coma por punto
         value = value.replace(',', '.');
     } else {
-        // "3.000" o "3 000" sin coma decimal → eliminar separadores de miles
-        value = value.replace(/\.(?=\d{3}($|[^\d]))/g, '');
+        // "3.000" debe ser interpretado como 3.0 ó 2.550 como 2.55
+        if(hasDot) {
+            value = value;
+        } else {
+            // "3000" o "3 000" sin coma decimal → eliminar separadores de miles
+            value = value.replace(/\.(?=\d{3}($|[^\d]))/g, '');
+        }
     }
 
     return parseFloat(value) || 0;
@@ -746,17 +767,35 @@ function updateInvoiceTotals() {
     var total_tva = 0;
     var total_ttc = 0;
     
+    // Sumar bases de líneas
     $(".totalhtline").each(function() {
         total_ht += parseFloat($(this).val()) || 0;
     });
     
+    // Sumar IVA de líneas
     $(".totalvaline").each(function() {
         total_tva += parseFloat($(this).val()) || 0;
     });
     
+    // Obtener valor de Retención (IRPF) global
+    // Nota: Si viene negativo (ej: -10.00), al sumarlo algebraicamente restará del total.
+    // Si el usuario lo introduce positivo, habría que restarlo, pero asumimos el formato del input original.
+    var localtax2 = parseLocalizedFloat($("#localtax2").val()) || 0;
+
+    // Calculamos el TTC sumando las líneas TTC
+    // PERO: Las líneas calculan TTC = HT + IVA. No incluyen la retención global.
+    // Por tanto, debemos recalcular el TTC global basándonos en los sumatorios + retención.
+    
+    // Opción A: Sumar los TTC de las líneas y añadir la retención global
+    /*
     $(".totalttcline").each(function() {
         total_ttc += parseFloat($(this).val()) || 0;
     });
+    total_ttc = total_ttc + localtax2; 
+    */
+
+    // Opción B (Más segura para consistencia aritmética): Recalcular desde bases globales
+    total_ttc = total_ht + total_tva + localtax2;
     
     $("#total_ht").val(total_ht.toFixed(2));
     $("#total_tva").val(total_tva.toFixed(2));

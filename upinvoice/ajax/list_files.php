@@ -130,6 +130,15 @@ if (count($files) == 0) {
         
         // Files list
         foreach ($files as $file) {
+            // Check if file is stuck in processing state (processing == 1 but last modification was more than 100 seconds ago)
+            $isStuckProcessing = false;
+            if ($file->processing == 1) {
+                $timeSinceModification = time() - $file->date_modification;
+                if ($timeSinceModification > 100) {
+                    $isStuckProcessing = true;
+                }
+            }
+            
             $html .= '<div class="file-card">';
             
             // File thumbnail and info grouped together on left
@@ -160,10 +169,13 @@ if (count($files) == 0) {
             
             // Status column on right side
             $html .= '<div class="file-status" id="file-status-' . $file->id . '">';
-            if ($file->processing == 1) {
+            if ($file->processing == 1 && !$isStuckProcessing) {
                 $html .= '<i class="fas fa-spinner fa-spin"></i> ' . $langs->trans('Processing');
             } else {
-                switch ($file->status) {
+                // If stuck processing, show as error
+                $statusToDisplay = $isStuckProcessing ? -1 : $file->status;
+                
+                switch ($statusToDisplay) {
                     case 0:
                         $html .= '<span class="badge badge-pending">' . $langs->trans('Pending') . '</span>';
                         break;
@@ -185,7 +197,7 @@ if (count($files) == 0) {
             $html .= '<div class="file-card-divider"></div>';
             
             // Progress bar for processing files
-            if ($file->processing == 1) {
+            if ($file->processing == 1 && !$isStuckProcessing) {
                 $html .= '<div id="file-progress-' . $file->id . '" class="file-progress">';
                 $html .= '<div class="progress">';
                 $html .= '<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 30%;" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100">30%</div>';
@@ -202,7 +214,7 @@ if (count($files) == 0) {
             
             // Actions at bottom
             $html .= '<div class="file-actions">';
-            if ($file->processing == 0) {
+            if ($file->processing == 0 || $isStuckProcessing) {
                 // For pending tab (files with invoice)
                 if ($fileType === 'pending') {
                     // Si tenemos un fk_supplier pero no un fk_invoice, mostrar "Validar factura"
@@ -212,11 +224,17 @@ if (count($files) == 0) {
                         $html .= '</a>';
                     }
                     // Otros casos según el estado
-                    elseif ($file->status == 0) {
-                        // Pending: show process button
-                        $html .= '<button class="btn btn-primary btn-sm process-file-btn" data-file-id="' . $file->id . '">';
-                        $html .= '<i class="fas fa-cogs"></i> ' . $langs->trans('Process');
-                        $html .= '</button>';
+                    elseif ($file->status == 0 || $isStuckProcessing) {
+                        // Pending or stuck: show process/retry button
+                        if ($isStuckProcessing) {
+                            $html .= '<button class="btn btn-warning btn-sm process-file-btn" data-file-id="' . $file->id . '">';
+                            $html .= '<i class="fas fa-redo"></i> ' . $langs->trans('Retry');
+                            $html .= '</button>';
+                        } else {
+                            $html .= '<button class="btn btn-primary btn-sm process-file-btn" data-file-id="' . $file->id . '">';
+                            $html .= '<i class="fas fa-cogs"></i> ' . $langs->trans('Process');
+                            $html .= '</button>';
+                        }
                     } elseif ($file->status == 1 && $file->import_step > 1 && empty($file->fk_supplier)) {
                         // Si está procesado pero no tiene proveedor, mostrar "Siguiente paso" para ir a validar proveedor
                         $html .= '<a href="' . dol_buildpath('/upinvoice/supplier.php', 1) . '?file_id=' . $file->id . '" class="btn btn-success btn-sm">';
@@ -234,15 +252,15 @@ if (count($files) == 0) {
                     $html .= '<i class="fas fa-trash"></i>';
                     $html .= '</button>';
                     
-                    // Pause button solo para archivos pendientes
-                    if ($file->status == 0) {
+                    // Pause button solo para archivos pendientes (no para stuck)
+                    if ($file->status == 0 && !$isStuckProcessing) {
                         $html .= ' <button class="btn btn-outline-warning btn-sm pause-file-btn" data-file-id="' . $file->id . '" title="' . $langs->trans('PauseProcessing') . '">';
                         $html .= '<i class="fas fa-pause"></i>';
                         $html .= '</button>';
                     }
                 }
             } else {
-                // If processing, show spinner
+                // If actively processing (not stuck), show spinner
                 $html .= '<button class="btn btn-secondary btn-sm" disabled>';
                 $html .= '<i class="fas fa-spinner fa-spin"></i>';
                 $html .= '</button>';
