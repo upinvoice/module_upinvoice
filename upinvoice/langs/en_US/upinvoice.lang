@@ -72,7 +72,7 @@ AllFilesAreDuplicates=All files are already uploaded
 # Confirmations
 ConfirmDeleteFile=Are you sure you want to delete this file?
 ConfirmReplacePrice=Do you want to replace the current price with the product price?
-ConfirmReplaceVAT=Do you want to replace the current VAT rate with the product's rate?
+ConfirmReplaceVAT=Do you want to replace the current VAT rate with the product´s rate?
 Current=Current
 New=New
 

@@ -58,10 +58,10 @@ FileTooBig=Fichier trop volumineux
 PartialUpload=Téléchargement partiel
 NoFileUploaded=Aucun fichier téléchargé
 TempDirError=Erreur dans le répertoire temporaire
-WriteError=Erreur d'écriture
-ExtensionError=Erreur d'extension
+WriteError=Erreur d´écriture
+ExtensionError=Erreur d´extension
 UnknownError=Erreur inconnue
-WarningUpInvoiceAPIKeyNotConfigured=Avertissement: La clé API d'UpInvoice n'est pas configurée
+WarningUpInvoiceAPIKeyNotConfigured=Avertissement: La clé API d´UpInvoice n´est pas configurée
 GoToModuleSetup=Aller à la configuration du module
 GoToUpload=Aller au téléchargement
 DuplicateFileDetected=Un fichier en doublon a été détecté
@@ -149,7 +149,7 @@ VATAmountMismatch=Le montant de TVA ne correspond pas
 TotalTTCMismatch=Le total TTC ne correspond pas
 DateMismatch=La date ne correspond pas
 LineCountMismatch=Le nombre de lignes ne correspond pas
-CompletionDate=Date d'achèvement
+CompletionDate=Date d´achèvement
 TotalAmountWarning=Différence de montant détectée
 AmountDetected=Montant détecté
 AmountSaved=Montant enregistré
@@ -178,27 +178,27 @@ Actions=Actions
 
 # Errores de API
 SupplierIdRequired=ID fournisseur requis
-ErrorAddingInvoiceLine=Erreur lors de l'ajout d'une ligne de facture
+ErrorAddingInvoiceLine=Erreur lors de l´ajout d´une ligne de facture
 ErrorValidatingInvoice=Erreur lors de la validation de la facture
-ErrorAttachingDocument=Erreur lors de l'attachement du document
+ErrorAttachingDocument=Erreur lors de l´attachement du document
 InvoiceCreatedSuccessfully=Facture créée avec succès
 InvoiceCreatedAndValidatedSuccessfully=Facture créée et validée avec succès
 NoSupplierSelected=Aucun fournisseur sélectionné
 SupplierNotFound=Fournisseur non trouvé
 
 # Module configuration
-UpInvoiceSetup=Configuration d'UpInvoice
-APIUrl=URL de l'API
-APIUrlHelp=URL de l'API UpInvoice (exemple: https://upinvoice.eu/api/process-invoice)
+UpInvoiceSetup=Configuration d´UpInvoice
+APIUrl=URL de l´API
+APIUrlHelp=URL de l´API UpInvoice (exemple: https://upinvoice.eu/api/process-invoice)
 APIKey=Clé API
-APIKeyHelp=Clé d'authentification pour l'API UpInvoice
+APIKeyHelp=Clé d´authentification pour l´API UpInvoice
 HowToGetAPIKey=Pour obtenir la clé, créez un compte sur <a href="https://upinvoice.eu" targe="_blank">UpInvoice.eu</a> et accédez à <a href="https://upinvoice.eu/api/tokens" target="_blank"><strong>la section clés API</strong></a>.
 Save=Enregistrer
 TestAPIConnection=Tester la connexion API
-APIConfigurationMissing=Configuration de l'API manquante
-APIConnectionError=Erreur de connexion à l'API
-APIConnectionSuccess=Connexion à l'API réussie
-APIConnectionFailed=Échec de la connexion à l'API
+APIConfigurationMissing=Configuration de l´API manquante
+APIConnectionError=Erreur de connexion à l´API
+APIConnectionSuccess=Connexion à l´API réussie
+APIConnectionFailed=Échec de la connexion à l´API
 Settings=Paramètres
 
 # Procesamiento de archivos
@@ -212,7 +212,7 @@ ZoomIn=Zoomer
 ZoomOut=Dézoomer
 RotateLeft=Pivoter à gauche
 RotateRight=Pivoter à droite
-AllFilesQueued=Tous les fichiers sont en file d'attente
+AllFilesQueued=Tous les fichiers sont en file d´attente
 ProcessingFiles=Traitement des fichiers
 ParallelProcessing=Traitement parallèle
 UploadProgress=Progression du téléchargement
@@ -223,14 +223,14 @@ FileType=Type de fichier
 FileUploadDate=Date de téléchargement
 ProcessingTime=Temps de traitement
 EstimatedTimeRemaining=Temps restant estimé
-ViewDetailedPreview=Voir l'aperçu détaillé
-UploadQueue=File d'attente de téléchargement
-ProcessingQueue=File d'attente de traitement
-QueueStatus=État de la file d'attente
-QueuePaused=File d'attente en pause
-QueueActive=File d'attente active
-AddToQueue=Ajouter à la file d'attente
-RemoveFromQueue=Retirer de la file d'attente
+ViewDetailedPreview=Voir l´aperçu détaillé
+UploadQueue=File d´attente de téléchargement
+ProcessingQueue=File d´attente de traitement
+QueueStatus=État de la file d´attente
+QueuePaused=File d´attente en pause
+QueueActive=File d´attente active
+AddToQueue=Ajouter à la file d´attente
+RemoveFromQueue=Retirer de la file d´attente
 ValidateInvoice=Valider la facture
 ViewInvoice=Voir la facture
 
@@ -252,9 +252,9 @@ SupplierConfirmed=Fournisseur confirmé
 MissingParameters=Paramètres manquants
 
 # Estado de procesamiento
-ProcessingInProgress=Traitement en cours. Veuillez attendre qu'il soit terminé pour traiter un autre fichier
+ProcessingInProgress=Traitement en cours. Veuillez attendre qu´il soit terminé pour traiter un autre fichier
 NoFilesToProcess=Aucun fichier à traiter
-FilesInQueue=fichiers dans la file d'attente
+FilesInQueue=fichiers dans la file d´attente
 AutomaticProcessing=Traitement automatique
 AutoProcessingActive=Traitement automatique activé
 AutoProcessingNote=Les fichiers seront traités automatiquement les uns après les autres
