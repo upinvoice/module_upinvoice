@@ -34,7 +34,7 @@ class modUpInvoice extends DolibarrModules
         $this->description = "Module for supplier invoice import using UpInvoice api REST";
         $this->descriptionlong = "This module allows to upload, validate and register supplier invoices in a three steps process";
         $this->editor_name = "UpInvoice.eu";
-        $this->editor_url = "";
+        $this->editor_url = "https://upinvoice.eu";
         $this->version = '1.2.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';

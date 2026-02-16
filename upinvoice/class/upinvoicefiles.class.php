@@ -486,6 +486,10 @@ class UpInvoiceFiles extends CommonObject
             $this->processing = 0; // No longer processing
             $this->import_step = 2; // Next step: supplier validation
             $this->import_error = '';
+
+            if (method_exists($this->db, 'ping')) {
+                $this->db->ping(); 
+            }
             
             $result = $this->update($user, 1);
             if ($result < 0) {
