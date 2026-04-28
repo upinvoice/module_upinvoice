@@ -109,10 +109,9 @@ print '<p>' . $langs->trans('OrClickToSelect') . '</p>';
 print '<input type="file" id="fileupload" name="fileupload[]" multiple style="display:none;">';
 print '<button class="btn btn-primary" id="select-files">' . $langs->trans('SelectFiles') . '</button>';
 print '</div>';
-print '</div>';
 
-// Preview zone for files being uploaded
-print '<div id="upload-previews" class="upload-previews-container">';
+// Preview zone for files being uploaded - Integrated into dropzone
+print '<div id="upload-previews" class="upload-previews-container" style="display: none;"></div>';
 print '</div>';
 print '</div>';
 
@@ -301,7 +300,8 @@ $(document).ready(function() {
         for (var i = 0; i < files.length; i++) {
             var file = files[i];
             var previewItem = document.createElement('div');
-            previewItem.className = 'upload-preview-item';
+            previewItem.className = 'upload-preview-item-compact';
+            previewItem.id = 'upload-preview-' + i;
             
             // Add appropriate icon based on file type
             var iconClass = 'fas fa-file';
@@ -311,59 +311,54 @@ $(document).ready(function() {
                 iconClass = 'fas fa-file-image';
             }
             
-            // Create preview thumbnail
-            var thumb = document.createElement('div');
-            thumb.className = 'preview-thumbnail';
+            previewItem.innerHTML = `
+                <div class="preview-icon"><i class="${iconClass}"></i></div>
+                <div class="preview-info-compact">
+                    <div class="preview-name" title="${file.name}">${file.name}</div>
+                    <div class="progress-pizza">
+                        <svg width="20" height="20">
+                            <circle class="bg" cx="10" cy="10" r="9"></circle>
+                            <circle class="bar" cx="10" cy="10" r="9" style="stroke-dashoffset: 56.5;"></circle>
+                        </svg>
+                    </div>
+                    <i class="fas fa-check-circle status-icon status-icon-success"></i>
+                    <i class="fas fa-exclamation-triangle status-icon status-icon-warning"></i>
+                    <i class="fas fa-times-circle status-icon status-icon-error"></i>
+                    <span class="preview-status-text"></span>
+                </div>
+                <i class="fas fa-times remove-preview" title="Dismiss"></i>
+            `;
             
-            // For images, show actual thumbnail
-            if (file.type.indexOf('image') !== -1) {
-                var img = document.createElement('img');
-                img.file = file;
-                thumb.appendChild(img);
-                
-                // Use FileReader to get image data
-                var reader = new FileReader();
-                reader.onload = (function(aImg) { 
-                    return function(e) { 
-                        aImg.src = e.target.result; 
-                    }; 
-                })(img);
-                reader.readAsDataURL(file);
-            } else {
-                // For non-images, show icon
-                var icon = document.createElement('i');
-                icon.className = iconClass;
-                thumb.appendChild(icon);
-            }
-            
-            // Add file info
-            var info = document.createElement('div');
-            info.className = 'preview-info';
-            info.innerHTML = '<div class="preview-name">' + file.name + '</div>' +
-                            '<div class="preview-size">' + formatFileSize(file.size) + '</div>';
-            
-            previewItem.appendChild(thumb);
-            previewItem.appendChild(info);
-            
-            // Add progress bar
-            var progressBar = document.createElement('div');
-            progressBar.className = 'preview-progress';
-            progressBar.innerHTML = createProgressBar(0);
-            previewItem.appendChild(progressBar);
+            // Handle remove button
+            previewItem.querySelector('.remove-preview').addEventListener('click', function(e) {
+                e.stopPropagation();
+                var item = this.closest('.upload-preview-item-compact');
+                $(item).fadeOut(300, function() {
+                    $(this).remove();
+                    if ($('#upload-previews').children().length === 0) {
+                        $('.dropzone-content').fadeIn(300);
+                        $('#upload-previews').hide();
+                    }
+                });
+            });
             
             uploadPreviews.appendChild(previewItem);
         }
         
-        // Show upload previews container
+        // Show upload previews container and hide dropzone text
         uploadPreviews.style.display = 'flex';
+        $(dropzone).find('.dropzone-content').fadeOut(300);
     }
     
     // Update preview progress
     function updatePreviewProgress(index, percentage) {
-        var previewItems = uploadPreviews.querySelectorAll('.upload-preview-item');
-        if (index < previewItems.length) {
-            var progressBar = previewItems[index].querySelector('.preview-progress');
-            updateProgressBar(progressBar, percentage);
+        var $preview = $('#upload-preview-' + index);
+        if ($preview.length) {
+            var circle = $preview.find('.progress-pizza circle.bar');
+            if (circle.length) {
+                var offset = 56.5 * (1 - (percentage / 100));
+                circle.css('stroke-dashoffset', offset);
+            }
         }
     }
     
@@ -392,35 +387,25 @@ $(document).ready(function() {
                             if (result.status === 'success') {
                                 if (result.isDuplicate) {
                                     duplicateCount++;
-                                    showNotification('<i class="fas fa-exclamation-circle"></i> ' + '<?php echo $langs->trans('FileAlreadyUploaded'); ?>: ' + file.name, 'warning');
                                     // Update preview to show duplicate
-                                    updatePreviewToDuplicate(index);
+                                    updatePreviewToDuplicate(index, '<?php echo $langs->trans('FileAlreadyUploaded'); ?>');
                                 } else {
                                     nonDuplicateFiles.push({file: file, index: index});
                                 }
                             } else {
-                                // Error checking, include file to be safe
                                 nonDuplicateFiles.push({file: file, index: index});
                             }
                         } catch (e) {
-                            // Error parsing, include file to be safe
                             nonDuplicateFiles.push({file: file, index: index});
                         }
                         
-                        // If all files have been checked, call the callback
                         if (checkCount === files.length) {
-                            if (duplicateCount > 0) {
-                                showNotification('<i class="fas fa-info-circle"></i> ' + duplicateCount + ' <?php echo $langs->trans('DuplicateFilesSkipped'); ?>', 'warning');
-                            }
                             callback(nonDuplicateFiles);
                         }
                     },
                     error: function() {
                         checkCount++;
-                        // Error checking, include file to be safe
                         nonDuplicateFiles.push({file: file, index: index});
-                        
-                        // If all files have been checked, call the callback
                         if (checkCount === files.length) {
                             callback(nonDuplicateFiles);
                         }
@@ -431,14 +416,11 @@ $(document).ready(function() {
     }
     
     // Update preview to show file is duplicate
-    function updatePreviewToDuplicate(index) {
-        var previewItems = uploadPreviews.querySelectorAll('.upload-preview-item');
-        if (index < previewItems.length) {
-            var previewItem = previewItems[index];
-            previewItem.classList.add('duplicate');
-            
-            var progressBar = previewItem.querySelector('.preview-progress');
-            progressBar.innerHTML = '<div class="duplicate-label"><?php echo $langs->trans('Duplicate'); ?></div>';
+    function updatePreviewToDuplicate(index, message) {
+        var $preview = $('#upload-preview-' + index);
+        if ($preview.length) {
+            $preview.addClass('duplicate');
+            $preview.find('.preview-status-text').text(message);
         }
     }
     
@@ -448,22 +430,14 @@ $(document).ready(function() {
         
         var formData = new FormData();
         
-        // Add files to FormData
         for (var i = 0; i < fileInfos.length; i++) {
             var fileInfo = fileInfos[i];
             formData.append('userfile[]', fileInfo.file);
-            
-            // Update progress to show upload starting
             updatePreviewProgress(fileInfo.index, 5);
         }
         
-        // Add CSRF token
         formData.append('token', '<?php echo newToken(); ?>');
         
-        // Show upload notification
-        showNotification('<i class="fas fa-spinner fa-spin"></i> ' + '<?php echo $langs->trans('UploadingFiles'); ?>', 'info');
-        
-        // Send files to server
         $.ajax({
             url: '<?php echo dol_buildpath('/upinvoice/ajax/upload.php', 1); ?>',
             type: 'POST',
@@ -472,38 +446,29 @@ $(document).ready(function() {
             contentType: false,
             xhr: function() {
                 var xhr = new XMLHttpRequest();
-                
-                // Add progress event listener
                 xhr.upload.addEventListener('progress', function(e) {
                     if (e.lengthComputable) {
                         var percentComplete = Math.round((e.loaded / e.total) * 100);
-                        
-                        // Update all file previews with progress
                         for (var i = 0; i < fileInfos.length; i++) {
                             updatePreviewProgress(fileInfos[i].index, percentComplete);
                         }
                     }
                 }, false);
-                
                 return xhr;
             },
             success: function(response) {
                 try {
-                    // Si response no es JSON, por ejemplo, no contiene { como primer caracter, mostramos el string directamente
                     if (response.charAt(0) !== '{') {
                         showNotification('<i class="fas fa-exclamation-circle"></i> ' + response, 'error');
                         return;
                     }
                     var result = JSON.parse(response);
                     if (result.status === 'success') {
-                        showNotification('<i class="fas fa-check-circle"></i> ' + '<?php echo $langs->trans('UploadComplete'); ?>', 'success');
-                        
                         // Update preview status for each file
                         for (var i = 0; i < result.files.length; i++) {
                             var fileResult = result.files[i];
                             var fileIndex = -1;
                             
-                            // Find the corresponding file index
                             for (var j = 0; j < fileInfos.length; j++) {
                                 if (fileInfos[j].file.name === fileResult.name) {
                                     fileIndex = fileInfos[j].index;
@@ -512,30 +477,31 @@ $(document).ready(function() {
                             }
                             
                             if (fileIndex !== -1) {
+                                var $preview = $('#upload-preview-' + fileIndex);
                                 if (fileResult.status === 'success') {
-                                    // Update progress to 100%
                                     updatePreviewProgress(fileIndex, 100);
+                                    $preview.addClass('success');
                                     
-                                    // Add success indicator
-                                    var previewItems = uploadPreviews.querySelectorAll('.upload-preview-item');
-                                    if (fileIndex < previewItems.length) {
-                                        previewItems[fileIndex].classList.add('success');
-                                    }
+                                    // Auto-dismiss successful uploads after 4 seconds
+                                    (function($el) {
+                                        setTimeout(function() {
+                                            $el.fadeOut(500, function() { 
+                                                $(this).remove(); 
+                                                // If no more previews, show dropzone content again
+                                                if ($('#upload-previews').children().length === 0) {
+                                                    $('.dropzone-content').fadeIn(300);
+                                                    $('#upload-previews').hide();
+                                                }
+                                            });
+                                        }, 4000);
+                                    })($preview);
                                 } else {
-                                    // Add error indicator
-                                    var previewItems = uploadPreviews.querySelectorAll('.upload-preview-item');
-                                    if (fileIndex < previewItems.length) {
-                                        previewItems[fileIndex].classList.add('error');
-                                        
-                                        // Show error message
-                                        var progressBar = previewItems[fileIndex].querySelector('.preview-progress');
-                                        progressBar.innerHTML = '<div class="error-label">' + fileResult.message + '</div>';
-                                    }
+                                    $preview.addClass('error');
+                                    $preview.find('.preview-status-text').text(fileResult.message);
                                 }
                             }
                         }
                         
-                        // Load updated files list after a short delay
                         setTimeout(function() {
                             loadFilesList();
                         }, 1000);
@@ -544,12 +510,10 @@ $(document).ready(function() {
                     }
                 } catch (e) {
                     showNotification('<i class="fas fa-exclamation-circle"></i> ' + '<?php echo $langs->trans('ErrorProcessingResponse'); ?>', 'error');
-                    console.error('Error parsing response', e);
                 }
             },
             error: function(xhr, status, error) {
                 showNotification('<i class="fas fa-exclamation-circle"></i> ' + '<?php echo $langs->trans('UploadFailed'); ?>: ' + error, 'error');
-                console.error('Upload failed', error);
             }
         });
     }

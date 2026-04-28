@@ -1793,3 +1793,133 @@ input.totalttcline {
         margin-bottom: 10px;
     }
 }
+
+/* Modern Minimalist Upload Previews */
+.upinvoiceimport-dropzone {
+    position: relative;
+    overflow: hidden;
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.upload-previews-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: auto;
+    max-width: 350px;
+    z-index: 10;
+    pointer-events: none; /* Allow drag/drop through container */
+}
+
+.upload-preview-item-compact {
+    pointer-events: auto; /* Re-enable for buttons */
+    display: flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-left: 3px solid #2196F3;
+    padding: 6px 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    animation: slideInLeft 0.3s ease-out;
+    border-radius: 0 4px 4px 0;
+    transition: all 0.3s ease;
+}
+
+@keyframes slideInLeft {
+    from { transform: translateX(-20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.upload-preview-item-compact .preview-icon {
+    font-size: 1.1em;
+    margin-right: 10px;
+    color: #555;
+}
+
+.upload-preview-item-compact .preview-info-compact {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+}
+
+.upload-preview-item-compact .preview-name {
+    font-size: 0.85em;
+    font-weight: 500;
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Circular Progress "Pizza" */
+.progress-pizza {
+    position: relative;
+    width: 20px;
+    height: 20px;
+}
+
+.progress-pizza svg {
+    transform: rotate(-90deg);
+}
+
+.progress-pizza circle {
+    fill: none;
+    stroke-width: 3;
+}
+
+.progress-pizza .bg {
+    stroke: #eee;
+}
+
+.progress-pizza .bar {
+    stroke: #2196F3;
+    stroke-dasharray: 56.5; /* 2 * PI * R (approx) */
+    stroke-dashoffset: 56.5;
+    transition: stroke-dashoffset 0.3s ease;
+}
+
+.upload-preview-item-compact .status-icon {
+    font-size: 1em;
+    display: none;
+}
+
+.upload-preview-item-compact .remove-preview {
+    margin-left: 10px;
+    cursor: pointer;
+    color: #999;
+    font-size: 0.8em;
+    transition: color 0.2s;
+}
+
+.upload-preview-item-compact .remove-preview:hover {
+    color: #e53935;
+}
+
+/* Status specific overrides - No backgrounds as requested */
+.upload-preview-item-compact.success { border-left-color: #4CAF50; }
+.upload-preview-item-compact.success .progress-pizza { display: none; }
+.upload-preview-item-compact.success .status-icon-success { display: block; color: #4CAF50; }
+
+.upload-preview-item-compact.duplicate { border-left-color: #FFC107; background: rgba(255, 255, 255, 0.95); }
+.upload-preview-item-compact.duplicate .progress-pizza { display: none; }
+.upload-preview-item-compact.duplicate .status-icon-warning { display: block; color: #FFC107; }
+
+.upload-preview-item-compact.error { border-left-color: #F44336; }
+.upload-preview-item-compact.error .progress-pizza circle.bar { stroke: #F44336; }
+.upload-preview-item-compact.error .status-icon-error { display: block; color: #F44336; }
+
+.preview-status-text {
+    font-size: 0.75em;
+    color: #666;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
