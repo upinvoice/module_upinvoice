@@ -83,10 +83,14 @@ if ($result <= 0) {
     exit;
 }
 
-// Check if file is already being processed (but allow if it's stuck for more than 100 seconds)
+// Check if file is already being processed (but allow if it's stuck beyond the threshold)
+$stuckSeconds = getDolGlobalInt('UPINVOICE_STUCK_SECONDS', 180);
+if ($stuckSeconds < 30) {
+    $stuckSeconds = 30;
+}
 if ($upinvoicefiles->processing == 1) {
     $timeSinceModification = time() - $upinvoicefiles->date_modification;
-    if ($timeSinceModification <= 100) {
+    if ($timeSinceModification <= $stuckSeconds) {
         // File is actively processing, not stuck
         $result = array('status' => 'error', 'message' => $langs->trans('FileAlreadyProcessing'));
         echo json_encode($result);

@@ -130,11 +130,9 @@ function searchProducts($search, $product_type = -1, $limit = 10)
     $sql .= " WHERE (".implode(' AND ', $searchClauses).")";
     
     // Filter by product type if specified
-    // if ($product_type >= 0) {
-    //    $sql .= " AND p.fk_product_type = ".$product_type;
-    // }
-    
-    // $sql .= " AND p.tosell = 1"; // Only active products
+    /* if ($product_type >= 0) {
+        $sql .= " AND p.fk_product_type = ".$product_type;
+    } */
     
     // Filter by entity
     $sql .= " AND p.entity IN (".getEntity('product').")";

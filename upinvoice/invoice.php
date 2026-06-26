@@ -189,6 +189,9 @@ if ($action == 'create_invoice') {
     if(!$date){
         $date = dol_mktime(0, 0, 0, GETPOST('date_month', 'none'), GETPOST('date_day', 'none'), GETPOST('date_year', 'none'));
     }
+    // VAT calculation method chosen in the UI (1=total of round, 2=round of total)
+    $calc_method = GETPOSTINT('calc_method');
+
     // Collect form data
     $form_invoice_data = array(
         'ref_supplier' => GETPOST('ref_supplier', 'alpha'),
@@ -202,6 +205,11 @@ if ($action == 'create_invoice') {
         'total_tva' => price2num(GETPOST('total_tva', 'alpha')),
         'total_ttc' => price2num(GETPOST('total_ttc', 'alpha')),
         'localtax2' => price2num(GETPOST('localtax2', 'alpha')), // IRPF / Retención
+        'calc_method' => $calc_method,
+        // Extracted (document) totals from the AI JSON — authoritative reference for reconciliation
+        'extracted_total_ht'  => isset($invoice_data['total_ht'])  ? $invoice_data['total_ht']  : null,
+        'extracted_total_tva' => isset($invoice_data['total_tva']) ? $invoice_data['total_tva'] : null,
+        'extracted_total_ttc' => isset($invoice_data['total_ttc']) ? $invoice_data['total_ttc'] : null,
         'lines' => array(),
         'validate' => $validate_invoice // Pass validation flag to creation function
     );
@@ -246,6 +254,10 @@ if ($action == 'create_invoice') {
         $upinvoicefiles->import_step = 4; // Completed
         // Clear import errors
         $upinvoicefiles->import_error = '';
+        // Remember the VAT calculation method used to create the invoice
+        if (!empty($calc_method)) {
+            $upinvoicefiles->calc_method = $calc_method;
+        }
         $update_result = $upinvoicefiles->update($user);
 
         if ($update_result > 0) {
@@ -272,7 +284,8 @@ $morecss = array(
     '/upinvoice/css/upinvoiceimport.css'
 );
 
-// Page header
+// Page header — hide the left menu to give the document viewer + form full width
+$conf->dol_hide_leftmenu = 1;
 llxHeader('', $langs->trans($page_name), $help_url, '', 0, 0, $morejs, $morecss);
 
 print load_fiche_titre($langs->trans($page_name), '', 'title_accountancy');
@@ -280,39 +293,38 @@ print load_fiche_titre($langs->trans($page_name), '', 'title_accountancy');
 // Display current file and supplier info
 print '<div class="upinvoiceimport-container">';
 
-// File info card
-print '<table class="noborder centpercent">';
-print '<tr class="oddeven">';
-print '<td width="50%">';
 $previewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
-print '<strong>' . $langs->trans("FileName") . ':</strong> ' . dol_escape_htmltag($upinvoicefiles->original_filename);
-print '<div style="float:right">';
-print '<button id="preview-doc-btn" class="butAction" ';
-print 'data-file-path="'.$previewUrl.'" ';
-print 'data-file-type="'.$upinvoicefiles->file_type.'" ';
-print 'data-file-name="'.$upinvoicefiles->original_filename.'">';
-print '<i class="fas fa-eye"></i> ' . $langs->trans("ViewDocument") . '</button>';
-print '</div><br>';
-print '<strong>' . $langs->trans("UploadDate") . ':</strong> ' . dol_print_date($upinvoicefiles->date_creation, 'dayhour');
-print '</td>';
-print '<td width="50%">';
-print '<strong>' . $langs->trans("Name") . ':</strong> ' . $supplier->name;
+$isPdfDoc = (strpos((string) $upinvoicefiles->file_type, 'pdf') !== false);
 
-// Button to change supplier
-print ' <a href="' . $_SERVER['PHP_SELF'] . '?action=change_supplier&file_id=' . $upinvoicefiles->id . '" class="butAction butActionDelete butActionSmall">';
-print '<i class="fas fa-exchange-alt"></i> ' . $langs->trans("ChangeSupplier") . '</a><br>';
+// Two-column split: document viewer (left) + form (right)
+print '<div class="upinv-split">';
 
-if (!empty($supplier->idprof1)) print '<strong>' . $langs->trans("ProfId1") . ':</strong> ' . $supplier->idprof1 . '<br>';
-if (!empty($supplier->tva_intra)) print '<strong>' . $langs->trans("VATIntra") . ':</strong> ' . $supplier->tva_intra . '<br>';
-print '<strong>' . $langs->trans("Address") . ':</strong> ' . $supplier->address . ', ' . $supplier->zip . ' ' . $supplier->town;
-print '</td>';
-print '</tr>';
-print '</table>';
+// ---- LEFT 50%: live document viewer (replaces the old "View document" button) ----
+print '<div class="upinv-split-left">';
+if ($isPdfDoc) {
+    print '<iframe src="'.$previewUrl.'" class="upinv-doc-frame" title="'.dol_escape_htmltag($upinvoicefiles->original_filename).'"></iframe>';
+} else {
+    print '<div class="upinv-doc-imgwrap"><img src="'.$previewUrl.'" class="upinv-doc-img" alt="'.dol_escape_htmltag($upinvoicefiles->original_filename).'"></div>';
+}
+print '<div class="upinv-doc-foot opacitymedium small">'.dol_escape_htmltag($upinvoicefiles->original_filename).' &middot; '.dol_print_date($upinvoicefiles->date_creation, 'dayhour').'</div>';
+print '</div>'; // Close upinv-split-left
 
-// Document data for preview
-$documentPreviewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
-print '<input type="hidden" id="document-preview-path" value="'.$documentPreviewUrl.'">';
-print '<input type="hidden" id="document-preview-type" value="'.$upinvoicefiles->file_type.'">';
+// ---- RIGHT 50%: compact form ----
+print '<div class="upinv-split-right">';
+
+// Compact supplier strip
+print '<div class="upinv-supplier-strip">';
+print '<a href="'.$_SERVER['PHP_SELF'].'?action=change_supplier&file_id='.$upinvoicefiles->id.'" class="butAction butActionDelete butActionSmall" style="float:right">';
+print '<i class="fas fa-exchange-alt"></i> '.$langs->trans("ChangeSupplier").'</a>';
+print '<span class="upinv-supplier-name">'.dol_escape_htmltag($supplier->name).'</span>';
+if (!empty($supplier->idprof1)) print ' <span class="opacitymedium">&middot; '.dol_escape_htmltag($supplier->idprof1).'</span>';
+if (!empty($supplier->tva_intra)) print ' <span class="opacitymedium">&middot; '.dol_escape_htmltag($supplier->tva_intra).'</span>';
+if ($supplier->id > 0) {
+    print ' <a href="'.DOL_URL_ROOT.'/fourn/facture/list.php?socid='.((int) $supplier->id).'" target="_blank" class="upinv-link" title="'.dol_escape_htmltag($langs->trans("ViewSupplierInvoices")).'">&middot; <i class="fas fa-file-invoice"></i> '.$langs->trans("ViewSupplierInvoices").'</a>';
+}
+$supAddr = trim($supplier->address.', '.$supplier->zip.' '.$supplier->town, ', ');
+if (!empty($supAddr)) print '<div class="opacitymedium small">'.dol_escape_htmltag($supAddr).'</div>';
+print '</div>';
 
 // Start invoice form
 print '<form method="POST" action="' . $_SERVER['PHP_SELF'] . '" name="invoice_form" id="invoice_form">';
@@ -320,9 +332,8 @@ print '<input type="hidden" name="token" value="' . newToken() . '">';
 print '<input type="hidden" name="action" value="create_invoice">';
 print '<input type="hidden" name="file_id" value="' . $upinvoicefiles->id . '">';
 
-// Invoice data card
-print '<div class="fichecenter">';
-print '<div class="fichehalfleft">';
+// Header + totals (stacked, compact) inside the right column
+print '<div class="upinv-form">';
 
 // Display warnings if any
 if (!empty($warnings)) {
@@ -388,25 +399,21 @@ $form->select_comptes($payment_options['fk_account'], 'fk_account', 0, '', 1);
 print '</td>';
 print '</tr>';
 
-// Notes
+// Notes (collapsed by default to save vertical space)
 print '<tr>';
-print '<td>' . $langs->trans("Notes") . '</td>';
+print '<td><a href="#" id="upinv-notes-toggle" class="upinv-link">' . $langs->trans("Notes") . ' <i class="fas fa-chevron-down"></i></a></td>';
 print '<td>';
-print '<textarea name="note_public" rows="3" class="flat quatrevingtpercent" placeholder="' . $langs->trans("PublicNotes") . '"></textarea>';
-print '<br>';
-print '<textarea name="note_private" rows="3" class="flat quatrevingtpercent" placeholder="' . $langs->trans("PrivateNotes") . '"></textarea>';
+print '<div id="upinv-notes-row" style="display:none">';
+print '<textarea name="note_public" rows="2" class="flat quatrevingtpercent" placeholder="' . $langs->trans("PublicNotes") . '"></textarea>';
+print '<textarea name="note_private" rows="2" class="flat quatrevingtpercent" placeholder="' . $langs->trans("PrivateNotes") . '" style="margin-top:4px"></textarea>';
+print '</div>';
 print '</td>';
 print '</tr>';
 
 print '</table>';
 
-print '</div>'; // Close fichehalfleft
-
-
-print '<div class="fichehalfright">';
-
-// Invoice totals
-print '<table class="border centpercent">';
+// Invoice totals (stacked under the header)
+print '<table class="border centpercent upinv-totals">';
 
 // Total HT
 print '<tr class="liste_titre">';
@@ -416,9 +423,15 @@ print '<input type="text" name="total_ht" id="total_ht" class="flat right" value
 print '</td>';
 print '</tr>';
 
-// Total VAT
+// Total VAT (with recalculation method toggle, like Dolibarr's Mode1/Mode2)
 print '<tr>';
-print '<td>' . $langs->trans("TotalVAT") . '</td>';
+print '<td>' . $langs->trans("TotalVAT");
+print ' <span class="upinv-recalc" title="' . dol_escape_htmltag($langs->trans("UpInvoiceMethodHelp")) . '">';
+print '<span class="opacitymedium small">' . $langs->trans("UpInvoiceRecalc") . ':</span> ';
+print '<a href="#" class="upinv-method-btn" data-method="1">' . $langs->trans("UpInvoiceMethod1") . '</a> / ';
+print '<a href="#" class="upinv-method-btn" data-method="2">' . $langs->trans("UpInvoiceMethod2") . '</a>';
+print '</span>';
+print '</td>';
 print '<td class="right">';
 print '<input type="text" name="total_tva" id="total_tva" class="flat right" value="'.price($invoice_data['total_tva'] ?? 0).'">';
 print '</td>';
@@ -449,11 +462,11 @@ print '</tr>';
 
 print '</table>';
 
-print '</div>'; // Close fichehalfright
+// VAT method chosen + reconciliation warning vs the extracted document totals
+print '<input type="hidden" name="calc_method" id="calc_method" value="">';
+print '<div id="upinv-reconcile-warning" class="upinv-reconcile" style="display:none"></div>';
 
-print '</div>'; // Close fichecenter
-
-print '<div class="clearboth"></div><br>';
+print '</div>'; // Close upinv-form
 
 // Invoice lines card
 print '<div class="upinvoiceimport-invoice-card">';
@@ -463,14 +476,14 @@ print '<div class="upinvoiceimport-card-body">';
 print '<table class="noborder centpercent" id="invoice_lines_table">';
 print '<tr class="liste_titre">';
 print '<th class="linecoldescription minwidth300imp">' . $langs->trans("Description") . '</th>';
-print '<th class="center">' . $langs->trans("VAT") . '</th>';
 print '<th class="center">' . $langs->trans("Qty") . '</th>';
 print '<th class="center">' . $langs->trans("PriceUHT") . '</th>';
-print '<th class="center">' . $langs->trans("Discount") . '</th>';
-print '<th class="right">' . $langs->trans("TotalHT") . '</th>';
-print '<th class="right">' . $langs->trans("TotalVAT") . '</th>';
+print '<th class="center">' . $langs->trans("DiscountShort") . '</th>';
+print '<th class="right">' . $langs->trans("TaxBaseShort") . '</th>';
+print '<th class="center">% ' . $langs->trans("VAT") . '</th>';
+print '<th class="right">' . $langs->trans("VAT") . '</th>';
 print '<th class="right">' . $langs->trans("TotalTTC") . '</th>';
-print '<th class="center">' . $langs->trans("Actions") . '</th>';
+print '<th class="center"></th>';
 print '</tr>';
 
 // Lines from JSON data
@@ -482,6 +495,10 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
 
         // Description + Product selection/info
         print '<td>';
+
+        // Flag "extra": la línea suma solo al total del documento, no a la base/IVA extraídos.
+        // Se usa únicamente para la reconciliación de avisos (no altera el cálculo de la factura).
+        print '<input type="hidden" name="line_extra_'.$line_count.'" class="lineextra" value="'.(!empty($line['extra']) ? 1 : 0).'">';
 
         // --- START: Display Matched Product Info or Product Selector ---
         // Check if product matching was found
@@ -542,11 +559,6 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
         print '<textarea name="line_desc_'.$line_count.'" class="flat width100p" style="margin-top: 5px; width: 98%">'.dol_escape_htmltag($line['product_desc'] ?? '').'</textarea>';
         print '</td>';
 
-        // VAT rate
-        print '<td class="center">';
-        print '<input type="text" size="5" name="line_tva_tx_'.$line_count.'" value="'.price(isset($line['tva_tx']) ? $line['tva_tx'] : 0).'" class="flat tvaline right" onchange="updateLineTotals('.$line_count.')">';
-        print '</td>';
-
         // Quantity
         print '<td class="center">';
         print '<input type="text" size="5" name="line_qty_'.$line_count.'" value="'.(isset($line['qty']) ? $line['qty'] : 1).'" class="flat qtyline right" onchange="updateLineTotals('.$line_count.')">';
@@ -562,9 +574,14 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
         print '<input type="text" size="5" name="line_remise_percent_'.$line_count.'" value="'.price(isset($line['remise_percent']) ? $line['remise_percent'] : 0).'" class="flat remisepercentline right" onchange="updateLineTotals('.$line_count.')">';
         print '</td>';
 
-        // Total HT
+        // Total HT (Base)
         print '<td class="right">';
         print '<input type="text" size="8" name="line_total_ht_'.$line_count.'" value="'.price(isset($line['total_ht']) ? $line['total_ht'] : 0).'" class="flat totalhtline right" readonly>';
+        print '</td>';
+
+        // VAT rate
+        print '<td class="center">';
+        print '<input type="text" size="5" name="line_tva_tx_'.$line_count.'" value="'.price(isset($line['tva_tx']) ? $line['tva_tx'] : 0).'" class="flat tvaline right" onchange="updateLineTotals('.$line_count.')">';
         print '</td>';
 
         // Total VAT
@@ -591,7 +608,7 @@ print '</table>';
 
 // Add line button
 print '<div class="invoice-actions">';
-print '<a href="#" class="butAction" id="add-line-btn">' . $langs->trans("AddLine") . '</a>';
+print '<a href="#" class="butAction upinv-btn-blue upinv-btn-sm" id="add-line-btn">' . $langs->trans("AddLine") . '</a>';
 print '</div>';
 
 // Input to keep track of line count
@@ -601,13 +618,11 @@ print '</div>'; // Close card body
 print '</div>'; // Close card
 
 
-// Submit buttons - Modified to differentiate buttons
-print '<div class="center">';
-print '<input type="submit" class="button" name="create_only" value="' . $langs->trans("CreateInvoice") . '">';
-print ' &nbsp; ';
-print '<input type="submit" class="button" name="create_validate" value="' . $langs->trans("CreateAndValidateInvoice") . '" onclick="document.getElementById(\'validate_invoice\').value=\'1\';">';
-print ' &nbsp; ';
-print '<a href="'.dol_buildpath('/upinvoice/upload.php',1).'" class="button buttonRefused">' . $langs->trans("Cancel") . '</a>';
+// Submit buttons: Cancel on the left, create actions on the right (validate = far right with check)
+print '<div class="upinv-form-actions">';
+print '<a href="'.dol_buildpath('/upinvoice/upload.php',1).'" class="button buttonRefused upinv-cancel">' . $langs->trans("Cancel") . '</a>';
+print '<input type="submit" class="button upinv-btn-amber" name="create_only" value="' . $langs->trans("CreateInvoice") . '">';
+print '<button type="submit" class="button upinv-btn-green" name="create_validate" value="1" onclick="document.getElementById(\'validate_invoice\').value=\'1\';"><i class="fas fa-check"></i> ' . $langs->trans("CreateAndValidateInvoice") . '</button>';
 print '</div>';
 
 // Hidden field to indicate whether to validate or not
@@ -616,6 +631,9 @@ print '<input type="hidden" id="validate_invoice" name="validate_invoice" value=
 print '</form>';
 
 print '<input type="hidden" id="max_input_vars" value="'.ini_get('max_input_vars').'">';
+
+print '</div>'; // Close upinv-split-right
+print '</div>'; // Close upinv-split
 
 // Close container
 print '</div>';
@@ -660,6 +678,25 @@ print '</div>';
         'Current': '<?php echo dol_escape_js($langs->trans("Current")); ?>',
         'New': '<?php echo dol_escape_js($langs->trans("New")); ?>'
     };
+
+    // Extracted (document) totals — reference for auto-picking the VAT method and reconciling
+    var upinvoiceExtracted = {
+        total_ht:  <?php echo (float) ($invoice_data['total_ht'] ?? 0); ?>,
+        total_tva: <?php echo (float) ($invoice_data['total_tva'] ?? 0); ?>,
+        total_ttc: <?php echo (float) ($invoice_data['total_ttc'] ?? 0); ?>,
+        localtax2: <?php echo (float) ($invoice_data['localtax2'] ?? 0); ?>
+    };
+    var upinvoiceMethodLangs = {
+        match:     '<?php echo dol_escape_js($langs->trans("UpInvoiceAmountsMatch")); ?>',
+        adjusted:  '<?php echo dol_escape_js($langs->trans("UpInvoiceAmountAdjusted")); ?>',
+        mismatch:  '<?php echo dol_escape_js($langs->trans("UpInvoiceAmountMismatch")); ?>',
+        extracted: '<?php echo dol_escape_js($langs->trans("UpInvoiceExtracted")); ?>',
+        computed:  '<?php echo dol_escape_js($langs->trans("UpInvoiceComputed")); ?>',
+        diff:      '<?php echo dol_escape_js($langs->trans("UpInvoiceDifference")); ?>',
+        base:      '<?php echo dol_escape_js($langs->trans("TaxBaseShort")); ?>',
+        vat:       '<?php echo dol_escape_js($langs->trans("VAT")); ?>',
+        total:     '<?php echo dol_escape_js($langs->trans("TotalTTC")); ?>'
+    };
 </script>
 
 <script type="text/javascript">
@@ -676,14 +713,27 @@ $(document).ready(function() {
         var lineNum = $(this).data('line');
         deleteLine(lineNum);
     });
-    
+
+    // Collapsible notes
+    $('#upinv-notes-toggle').on('click', function(e) {
+        e.preventDefault();
+        $('#upinv-notes-row').slideToggle(120);
+        $(this).find('i').toggleClass('fa-chevron-down fa-chevron-up');
+    });
+
     // Initialize line totals
     for (var i = 0; i < <?php echo $line_count; ?>; i++) {
         updateLineTotals(i);
     }
     
-    // Calculate initial invoice totals based on loaded data
-    updateInvoiceTotals();
+    // Recalc method buttons (Method 1 / Method 2)
+    $('.upinv-method-btn').on('click', function(e) {
+        e.preventDefault();
+        upinvApplyMethod(parseInt($(this).data('method')) || 1);
+    });
+
+    // Auto-pick the VAT method closest to the extracted document totals (also renders totals + reconcile)
+    upinvAutoPickMethod();
     max_input_vars_check();
 
     // Manage "Create Invoice" button (without validating)
@@ -762,44 +812,144 @@ function updateLineTotals(lineNum) {
 }
 
 // Update invoice totals
+// ── VAT calculation methods (Method 1 = total of round, Method 2 = round of total) ──
+var upinvActiveMethod = 1;
+
+function upinvR2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+
+// Read each line's base (HT) and VAT rate from the table
+function upinvGetLines() {
+    var lines = [];
+    $("input.totalhtline").each(function() {
+        var name = $(this).attr('name') || '';
+        var m = name.match(/line_total_ht_(\d+)/);
+        if (!m) return;
+        var i = m[1];
+        var ht = parseFloat($(this).val()) || 0;
+        var tx = parseLocalizedFloat($("input[name='line_tva_tx_" + i + "']").val()) || 0;
+        var extra = ($("input[name='line_extra_" + i + "']").val() === '1');
+        lines.push({ ht: ht, tx: tx, extra: extra });
+    });
+    return lines;
+}
+
+// Method 1: round VAT on each line, then sum
+function upinvComputeMethod1(lines, localtax2) {
+    var ht = 0, tva = 0;
+    lines.forEach(function(l) {
+        ht += l.ht;
+        tva += upinvR2(l.ht * l.tx / 100);
+    });
+    ht = upinvR2(ht); tva = upinvR2(tva);
+    return { ht: ht, tva: tva, ttc: upinvR2(ht + tva + localtax2) };
+}
+
+// Method 2: sum bases per VAT rate, then round the VAT of each group
+function upinvComputeMethod2(lines, localtax2) {
+    var ht = 0, byRate = {};
+    lines.forEach(function(l) {
+        ht += l.ht;
+        byRate[l.tx] = (byRate[l.tx] || 0) + l.ht;
+    });
+    var tva = 0;
+    Object.keys(byRate).forEach(function(tx) {
+        tva += upinvR2(byRate[tx] * parseFloat(tx) / 100);
+    });
+    ht = upinvR2(ht); tva = upinvR2(tva);
+    return { ht: ht, tva: tva, ttc: upinvR2(ht + tva + localtax2) };
+}
+
+function upinvCompute(method, lines, localtax2) {
+    return method === 2 ? upinvComputeMethod2(lines, localtax2) : upinvComputeMethod1(lines, localtax2);
+}
+
+// Recompute and display invoice totals using the active method, then reconcile vs extracted
 function updateInvoiceTotals() {
-    var total_ht = 0;
-    var total_tva = 0;
-    var total_ttc = 0;
-    
-    // Sumar bases de líneas
-    $(".totalhtline").each(function() {
-        total_ht += parseFloat($(this).val()) || 0;
-    });
-    
-    // Sumar IVA de líneas
-    $(".totalvaline").each(function() {
-        total_tva += parseFloat($(this).val()) || 0;
-    });
-    
-    // Obtener valor de Retención (IRPF) global
-    // Nota: Si viene negativo (ej: -10.00), al sumarlo algebraicamente restará del total.
-    // Si el usuario lo introduce positivo, habría que restarlo, pero asumimos el formato del input original.
+    var lines = upinvGetLines();
     var localtax2 = parseLocalizedFloat($("#localtax2").val()) || 0;
+    var t = upinvCompute(upinvActiveMethod, lines, localtax2);
+    $("#total_ht").val(t.ht.toFixed(2));
+    $("#total_tva").val(t.tva.toFixed(2));
+    $("#total_ttc").val(t.ttc.toFixed(2));
+    upinvReconcile(t, lines);
+}
 
-    // Calculamos el TTC sumando las líneas TTC
-    // PERO: Las líneas calculan TTC = HT + IVA. No incluyen la retención global.
-    // Por tanto, debemos recalcular el TTC global basándonos en los sumatorios + retención.
-    
-    // Opción A: Sumar los TTC de las líneas y añadir la retención global
-    /*
-    $(".totalttcline").each(function() {
-        total_ttc += parseFloat($(this).val()) || 0;
+// Apply a method (updates display + hidden field + button state)
+function upinvApplyMethod(m) {
+    upinvActiveMethod = (m === 2) ? 2 : 1;
+    $('#calc_method').val(upinvActiveMethod);
+    $('.upinv-method-btn').removeClass('active');
+    $('.upinv-method-btn[data-method="' + upinvActiveMethod + '"]').addClass('active');
+    updateInvoiceTotals();
+}
+
+// Pick the method whose totals are closest to the extracted document totals
+function upinvAutoPickMethod() {
+    var ex = upinvoiceExtracted;
+    var lines = upinvGetLines();
+    var localtax2 = parseLocalizedFloat($("#localtax2").val()) || 0;
+    if (!ex || !ex.total_ttc) { upinvApplyMethod(1); return; }
+    var m1 = upinvComputeMethod1(lines, localtax2);
+    var m2 = upinvComputeMethod2(lines, localtax2);
+    var d1 = Math.abs(m1.ttc - ex.total_ttc) + Math.abs(m1.tva - ex.total_tva);
+    var d2 = Math.abs(m2.ttc - ex.total_ttc) + Math.abs(m2.tva - ex.total_tva);
+    upinvApplyMethod(d2 < d1 ? 2 : 1);
+}
+
+// Compare computed totals against extracted; fine-adjust (cents) or warn (large gap)
+function upinvReconcile(t, lines) {
+    lines = lines || [];
+    var nLines = lines.length;
+    var ex = upinvoiceExtracted;
+    var $w = $('#upinv-reconcile-warning');
+    if (!ex || !ex.total_ttc) { $w.hide().empty(); return; }
+    var tol = Math.min(0.10, 0.01 + 0.01 * (nLines || 1));
+
+    // Las líneas "extra" no van sumadas en la base/IVA del documento, solo en el total.
+    // Ajustamos la referencia extraída sumándoles esas líneas para comparar contra los
+    // totales calculados (que sí las incluyen). El TTC extraído ya las contiene.
+    var exHt = ex.total_ht, exTva = ex.total_tva, exTtc = ex.total_ttc;
+    lines.forEach(function(l) {
+        if (!l.extra) return;
+        exHt = upinvR2(exHt + l.ht);
+        exTva = upinvR2(exTva + upinvR2(l.ht * l.tx / 100));
     });
-    total_ttc = total_ttc + localtax2; 
-    */
 
-    // Opción B (Más segura para consistencia aritmética): Recalcular desde bases globales
-    total_ttc = total_ht + total_tva + localtax2;
-    
-    $("#total_ht").val(total_ht.toFixed(2));
-    $("#total_tva").val(total_tva.toFixed(2));
-    $("#total_ttc").val(total_ttc.toFixed(2));
+    var dTtc = upinvR2(exTtc - t.ttc);
+    var dTva = upinvR2(exTva - t.tva);
+    var dHt  = upinvR2(exHt - t.ht);
+
+    if (dTtc === 0 && dTva === 0 && dHt === 0) {
+        $w.attr('class', 'upinv-reconcile upinv-ok').html('<i class="fas fa-check-circle"></i> ' + upinvoiceMethodLangs.match).show();
+        return;
+    }
+    if (Math.abs(dTtc) <= tol && Math.abs(dHt) <= tol) {
+        // Cent-level gap: snap displayed totals to the extracted document values
+        // (ajustados con las líneas "extra", para no perder su importe de la base).
+        $("#total_ht").val(exHt.toFixed(2));
+        $("#total_tva").val(exTva.toFixed(2));
+        $("#total_ttc").val(exTtc.toFixed(2));
+        var cents = Math.round(Math.abs(dTtc) * 100);
+        var adjMsg = upinvoiceMethodLangs.adjusted || 'Adjusted %s cts';
+        adjMsg = (adjMsg.indexOf('%s') >= 0) ? adjMsg.replace('%s', cents) : (adjMsg + ' (' + cents + ')');
+        $w.attr('class', 'upinv-reconcile upinv-adjusted')
+          .html('<i class="fas fa-wand-magic-sparkles"></i> ' + adjMsg)
+          .show();
+        return;
+    }
+    // Large gap: warn per field, do not touch
+    function row(label, exv, comp, d) {
+        if (Math.round(d * 100) === 0) return '';
+        return '<div>' + label + ': ' + upinvoiceMethodLangs.extracted + ' <b>' + exv.toFixed(2) + '</b> · '
+            + upinvoiceMethodLangs.computed + ' <b>' + comp.toFixed(2) + '</b> · '
+            + upinvoiceMethodLangs.diff + ' <b>' + d.toFixed(2) + '</b></div>';
+    }
+    var rows = row(upinvoiceMethodLangs.base, exHt, t.ht, dHt)
+        + row(upinvoiceMethodLangs.vat, exTva, t.tva, dTva)
+        + row(upinvoiceMethodLangs.total, exTtc, t.ttc, dTtc);
+    $w.attr('class', 'upinv-reconcile upinv-mismatch')
+      .html('<div><i class="fas fa-exclamation-triangle"></i> ' + upinvoiceMethodLangs.mismatch + '</div>' + rows)
+      .show();
 }
 
 // Add a new line with product type selector and product select2
@@ -833,11 +983,11 @@ function addNewLine() {
             // Hidden product ID for new lines (value 0)
             '<input type="hidden" name="line_fk_product_' + lineCount + '" value="0">' +
         '</td>' +
-        '<td class="center"><input type="text" size="5" name="line_tva_tx_' + lineCount + '" value="' + defaultVat + '" class="flat tvaline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="center"><input type="text" size="5" name="line_qty_' + lineCount + '" value="1" class="flat qtyline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="center"><input type="text" size="8" name="line_pu_ht_' + lineCount + '" value="0" class="flat puhline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="center"><input type="text" size="5" name="line_remise_percent_' + lineCount + '" value="" class="flat remisepercentline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="right"><input type="text" size="8" name="line_total_ht_' + lineCount + '" value="0" class="flat totalhtline right" readonly></td>' +
+        '<td class="center"><input type="text" size="5" name="line_tva_tx_' + lineCount + '" value="' + defaultVat + '" class="flat tvaline right" onchange="updateLineTotals(' + lineCount + ')"></td>' +
         '<td class="right"><input type="text" size="8" name="line_total_tva_' + lineCount + '" value="0" class="flat totalvaline right" readonly></td>' +
         '<td class="right"><input type="text" size="8" name="line_total_ttc_' + lineCount + '" value="0" class="flat totalttcline right" readonly></td>' +
         '<td class="center"><a href="#" class="delete-line" data-line="' + lineCount + '"><i class="fas fa-trash"></i></a></td>' +

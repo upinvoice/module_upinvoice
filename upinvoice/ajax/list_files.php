@@ -79,6 +79,12 @@ if (!in_array($fileType, array('pending', 'finished'))) {
     $fileType = 'pending'; // Default to pending
 }
 
+// Seconds after which a file flagged as "processing" is considered stuck (configurable)
+$stuckSeconds = getDolGlobalInt('UPINVOICE_STUCK_SECONDS', 180);
+if ($stuckSeconds < 30) {
+    $stuckSeconds = 30;
+}
+
 // Initialize objects
 $upinvoicefiles = new UpInvoiceFiles($db);
 
@@ -119,7 +125,11 @@ $html = '';
 
 if (count($files) == 0) {
     if ($fileType === 'pending') {
-        $html .= '<div class="opacitymedium">' . $langs->trans('NoPendingFiles') . '</div>';
+        $html .= '<div class="upinvoice-empty-state">';
+        $html .= '<i class="fas fa-inbox"></i>';
+        $html .= '<p>' . $langs->trans('NoPendingFiles') . '</p>';
+        $html .= '<p class="opacitymedium small">' . $langs->trans('UploadFilesFromAreaAbove') . '</p>';
+        $html .= '</div>';
     } else {
         $html .= '<div class="opacitymedium">' . $langs->trans('NoFinishedFiles') . '</div>';
     }
@@ -130,22 +140,55 @@ if (count($files) == 0) {
         
         // Files list
         foreach ($files as $file) {
-            // Check if file is stuck in processing state (processing == 1 but last modification was more than 100 seconds ago)
+            // Check if file is stuck in processing state (processing == 1 but last modification was more than UPINVOICE_STUCK_SECONDS ago)
             $isStuckProcessing = false;
             if ($file->processing == 1) {
                 $timeSinceModification = time() - $file->date_modification;
-                if ($timeSinceModification > 100) {
+                if ($timeSinceModification > $stuckSeconds) {
                     $isStuckProcessing = true;
                 }
             }
-            
-            $html .= '<div class="file-card">';
-            
+
+            // Does the stored JSON actually contain usable invoice data? A file can be
+            // flagged "Processed" with a response that carries no extraction (e.g. only
+            // {"available_points": N}); such a card must be retried, not advanced.
+            $hasInvoiceData = false;
+            if (!empty($file->api_json)) {
+                $jsonTmp = json_decode($file->api_json, true);
+                if (is_array($jsonTmp)) {
+                    $hasInvoiceData = !empty($jsonTmp['supplier']['name']) || !empty($jsonTmp['lines']);
+                }
+            }
+            // Processed but with no usable data and no supplier yet => recoverable error
+            $processedButEmpty = ($file->processing == 0 && $file->status == 1 && empty($file->fk_supplier) && !$hasInvoiceData);
+
+            // Resolve a single machine-readable state used for client-side filtering/sorting.
+            // 'processing' = running, 'stuck' = running too long, otherwise mirrors $file->status.
+            if ($file->processing == 1 && !$isStuckProcessing) {
+                $cardState = 'processing';
+            } elseif ($isStuckProcessing) {
+                $cardState = 'stuck';
+            } elseif ($processedButEmpty) {
+                $cardState = 'error';
+            } elseif ($file->status == 1) {
+                $cardState = 'processed';
+            } elseif ($file->status == -1) {
+                $cardState = 'error';
+            } else {
+                $cardState = 'pending';
+            }
+
+            $html .= '<div class="file-card" data-file-id="' . $file->id . '"';
+            $html .= ' data-state="' . $cardState . '"';
+            $html .= ' data-filename="' . dol_escape_htmltag(dol_strtolower($file->original_filename)) . '"';
+            $html .= ' data-size="' . (int) $file->file_size . '"';
+            $html .= ' data-date="' . (int) $file->date_creation . '">';
+
             // File thumbnail and info grouped together on left
             $html .= '<div class="file-card-top">';
-            
+
             // File thumbnail
-            $html .= '<div class="file-thumbnail" data-file-id="' . $file->id . '" data-file-name="' . dol_escape_htmltag($file->original_filename) . '" 
+            $html .= '<div class="file-thumbnail" role="button" tabindex="0" aria-label="' . dol_escape_htmltag($langs->trans('FilePreview')) . '" data-file-id="' . $file->id . '" data-file-name="' . dol_escape_htmltag($file->original_filename) . '"
                      data-file-type="' . dol_escape_htmltag($file->file_type) . '" data-file-path="' . dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($file->file_path)).'&cache=0' . '">';
             
             if (strpos($file->file_type, 'pdf') !== false) {
@@ -164,55 +207,83 @@ if (count($files) == 0) {
             $html .= '<div class="file-meta">';
             $html .= '<span><i class="fas fa-calendar-alt"></i> ' . dol_print_date($file->date_creation, 'dayhour') . '</span>';
             $html .= ' <span><i class="fas fa-weight"></i> ' . dol_print_size($file->file_size) . '</span>';
+            if (!empty($file->source) && $file->source === 'email') {
+                $html .= ' <span class="upinvoice-source-badge upinvoice-source-email"><i class="fas fa-envelope"></i> ' . $langs->trans('SourceEmail') . '</span>';
+            }
+            if (!empty($file->import_rule_label)) {
+                $html .= ' <span class="upinvoice-rule-tag" title="' . dol_escape_htmltag($langs->trans('ImportedByRule') . ': ' . $file->import_rule_label) . '"><i class="fas fa-robot"></i> ' . dol_escape_htmltag(dol_trunc($file->import_rule_label, 28)) . '</span>';
+            }
             $html .= '</div>';
             $html .= '</div>';
-            
+
             // Status column on right side
             $html .= '<div class="file-status" id="file-status-' . $file->id . '">';
-            if ($file->processing == 1 && !$isStuckProcessing) {
-                $html .= '<i class="fas fa-spinner fa-spin"></i> ' . $langs->trans('Processing');
-            } else {
-                // If stuck processing, show as error
-                $statusToDisplay = $isStuckProcessing ? -1 : $file->status;
-                
-                switch ($statusToDisplay) {
-                    case 0:
-                        $html .= '<span class="badge badge-pending">' . $langs->trans('Pending') . '</span>';
-                        break;
-                    case 1:
-                        $html .= '<span class="badge badge-processed">' . $langs->trans('Processed') . '</span>';
-                        break;
-                    case -1:
-                        $html .= '<span class="badge badge-error">' . $langs->trans('Error') . '</span>';
-                        break;
-                    default:
-                        $html .= '<span class="badge badge-pending">' . $langs->trans('Unknown') . '</span>';
-                }
+            switch ($cardState) {
+                case 'processing':
+                    $html .= '<i class="fas fa-spinner fa-spin"></i> ' . $langs->trans('ProcessingWithAI');
+                    break;
+                case 'stuck':
+                    $html .= '<span class="badge badge-warning" title="' . dol_escape_htmltag($langs->trans('StuckHelp')) . '"><i class="fas fa-exclamation-triangle"></i> ' . $langs->trans('FileStuck') . '</span>';
+                    break;
+                case 'processed':
+                    $html .= '<span class="badge badge-processed">' . $langs->trans('Processed') . '</span>';
+                    break;
+                case 'error':
+                    $html .= '<span class="badge badge-error">' . $langs->trans('Error') . '</span>';
+                    break;
+                default:
+                    $html .= '<span class="badge badge-pending">' . $langs->trans('Pending') . '</span>';
             }
             $html .= '</div>';
-            
+
             $html .= '</div>'; // End file-card-top
-            
+
             // Separator
             $html .= '<div class="file-card-divider"></div>';
-            
-            // Progress bar for processing files
-            if ($file->processing == 1 && !$isStuckProcessing) {
+
+            // Next-action hint: tells the user, in plain words, what this card is waiting for.
+            // Rendered inside the footer row (left), in line with the action buttons (right).
+            $nextAction = '';
+            if (!empty($file->fk_supplier) && empty($file->fk_invoice)) {
+                $nextAction = $langs->trans('NextActionInvoice');
+            } elseif ($cardState === 'processed' && $file->import_step > 1 && empty($file->fk_supplier)) {
+                $nextAction = $langs->trans('NextActionSupplier');
+            } elseif ($cardState === 'pending' || $cardState === 'stuck') {
+                $nextAction = $langs->trans('NextActionProcess');
+            }
+
+            // Progress indicator for files being processed. The AI call is a single
+            // synchronous request with no progress events, so we show an honest
+            // indeterminate bar (not a fake percentage) instead of misleading the user.
+            if ($cardState === 'processing') {
                 $html .= '<div id="file-progress-' . $file->id . '" class="file-progress">';
-                $html .= '<div class="progress">';
-                $html .= '<div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 30%;" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100">30%</div>';
+                $html .= '<div class="progress progress-indeterminate" role="progressbar" aria-label="' . dol_escape_htmltag($langs->trans('ProcessingWithAI')) . '">';
+                $html .= '<div class="progress-bar progress-bar-striped progress-bar-animated"></div>';
                 $html .= '</div>';
                 $html .= '</div>';
             }
-            
+
             // Error message if any
-            if (!empty($file->import_error)) {
+            $errorMsg = $file->import_error;
+            if (empty($errorMsg) && $processedButEmpty) {
+                $errorMsg = $langs->trans('CouldNotExtractInvoiceData');
+            }
+            if (!empty($errorMsg)) {
                 $html .= '<div class="file-error">';
-                $html .= '<span class="text-danger"><i class="fas fa-exclamation-circle"></i> ' . dol_escape_htmltag($file->import_error) . '</span>';
+                $html .= '<span class="text-danger"><i class="fas fa-exclamation-circle"></i> ' . dol_escape_htmltag($errorMsg) . '</span>';
                 $html .= '</div>';
             }
-            
-            // Actions at bottom
+
+            // Footer row: next-action hint (left) + action buttons (right), on one line
+            // to keep the card compact.
+            $html .= '<div class="file-card-footer">';
+            $html .= '<div class="file-next-action">';
+            if ($nextAction !== '') {
+                $html .= '<i class="fas fa-arrow-circle-right"></i> ' . $nextAction;
+            }
+            $html .= '</div>';
+
+            // Actions
             $html .= '<div class="file-actions">';
             if ($file->processing == 0 || $isStuckProcessing) {
                 // For pending tab (files with invoice)
@@ -235,6 +306,11 @@ if (count($files) == 0) {
                             $html .= '<i class="fas fa-cogs"></i> ' . $langs->trans('Process');
                             $html .= '</button>';
                         }
+                    } elseif ($processedButEmpty) {
+                        // Procesado pero sin datos extraíbles: ofrecer reintentar el procesado con IA
+                        $html .= '<button class="btn btn-warning btn-sm process-file-btn" data-file-id="' . $file->id . '">';
+                        $html .= '<i class="fas fa-redo"></i> ' . $langs->trans('Retry');
+                        $html .= '</button>';
                     } elseif ($file->status == 1 && $file->import_step > 1 && empty($file->fk_supplier)) {
                         // Si está procesado pero no tiene proveedor, mostrar "Siguiente paso" para ir a validar proveedor
                         $html .= '<a href="' . dol_buildpath('/upinvoice/supplier.php', 1) . '?file_id=' . $file->id . '" class="btn btn-success btn-sm">';
@@ -246,27 +322,21 @@ if (count($files) == 0) {
                         $html .= '<i class="fas fa-redo"></i> ' . $langs->trans('Retry');
                         $html .= '</button>';
                     }
-                    
+
                     // Delete button - always present in pending tab
-                    $html .= ' <button class="btn btn-danger btn-sm delete-file-btn" data-file-id="' . $file->id . '">';
+                    $html .= ' <button class="btn btn-danger btn-sm delete-file-btn" data-file-id="' . $file->id . '" title="' . dol_escape_htmltag($langs->trans('Delete')) . '" aria-label="' . dol_escape_htmltag($langs->trans('Delete')) . '">';
                     $html .= '<i class="fas fa-trash"></i>';
                     $html .= '</button>';
-                    
-                    // Pause button solo para archivos pendientes (no para stuck)
-                    if ($file->status == 0 && !$isStuckProcessing) {
-                        $html .= ' <button class="btn btn-outline-warning btn-sm pause-file-btn" data-file-id="' . $file->id . '" title="' . $langs->trans('PauseProcessing') . '">';
-                        $html .= '<i class="fas fa-pause"></i>';
-                        $html .= '</button>';
-                    }
                 }
             } else {
                 // If actively processing (not stuck), show spinner
-                $html .= '<button class="btn btn-secondary btn-sm" disabled>';
+                $html .= '<button class="btn btn-secondary btn-sm" disabled aria-label="' . dol_escape_htmltag($langs->trans('ProcessingWithAI')) . '">';
                 $html .= '<i class="fas fa-spinner fa-spin"></i>';
                 $html .= '</button>';
             }
             $html .= '</div>'; // End file-actions
-            
+            $html .= '</div>'; // End file-card-footer
+
             $html .= '</div>'; // End file-card
         }
         
@@ -293,9 +363,12 @@ if (count($files) == 0) {
             $html .= 'data-file-type="' . dol_escape_htmltag($file->file_type) . '" data-file-path="' . dol_buildpath('/viewimage.php', 1) . '?modulepart=upinvoice&file=temp/' . urlencode(basename($file->file_path)) . '&cache=0">';
             $html .= dol_escape_htmltag($file->original_filename);
             $html .= '</a>';
+            if (!empty($file->import_rule_label)) {
+                $html .= ' <span class="upinvoice-rule-tag" title="' . dol_escape_htmltag($langs->trans('ImportedByRule') . ': ' . $file->import_rule_label) . '"><i class="fas fa-robot"></i></span>';
+            }
             $html .= '</div>';
             $html .= '</td>';
-            
+
             // Column 2: File Size
             $html .= '<td class="right">' . dol_print_size($file->file_size) . '</td>';
             

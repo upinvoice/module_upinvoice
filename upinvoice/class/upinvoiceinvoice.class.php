@@ -113,8 +113,19 @@ class UpInvoiceInvoice
                         throw new Exception($langs->trans('ErrorAddingInvoiceLine') . ': ' . $invoice->error);
                     }
                 }
-                // Update invoice totals after all lines are added (to account for manual localtax2 updates)
-                $invoice->update_price(1);
+
+                // Recompute totals using the chosen VAT rounding method:
+                //   method 1 (total of round) -> roundingadjust '0'
+                //   method 2 (round of total) -> roundingadjust '1'
+                //   not provided -> 'auto' (Dolibarr default), keeps previous behaviour
+                $calc_method = !empty($invoiceData['calc_method']) ? (int) $invoiceData['calc_method'] : 0;
+                $roundmode = ($calc_method == 1) ? '0' : (($calc_method == 2) ? '1' : 'auto');
+                $invoice->fetch_thirdparty();
+                $invoice->update_price(1, $roundmode, 0, $invoice->thirdparty);
+
+                // Fine reconciliation: nudge one line so the invoice TTC matches the
+                // extracted document total exactly when the gap is cent-level (rounding).
+                $this->reconcileTotals($invoice, $invoiceData, $user);
             }
 
             // Validar la factura solo si se solicita explícitamente
@@ -233,6 +244,94 @@ class UpInvoiceInvoice
         }
 
         return $line_id;
+    }
+
+    /**
+     * Fine reconciliation of invoice totals against the extracted document totals.
+     *
+     * After update_price() recomputed totals from the lines using the chosen VAT method,
+     * a cent-level gap may remain versus the supplier document. When that gap is within a
+     * rounding tolerance, we absorb the cents into one line so that lines sum == invoice
+     * totals == the extracted TTC. A larger gap is left untouched (it likely signals an
+     * extraction error and is surfaced as a warning in the validation screen).
+     *
+     * @param FactureFournisseur $invoice     Invoice object (already priced)
+     * @param array              $invoiceData Form data (expects extracted_total_* keys)
+     * @param User               $user        Acting user
+     * @return void
+     */
+    private function reconcileTotals($invoice, $invoiceData, $user)
+    {
+        if (!isset($invoiceData['extracted_total_ttc'])) {
+            return;
+        }
+        $exTtc = (float) price2num($invoiceData['extracted_total_ttc']);
+        if ($exTtc <= 0) {
+            return;
+        }
+
+        $nlines = (isset($invoiceData['lines']) && is_array($invoiceData['lines'])) ? count($invoiceData['lines']) : 1;
+        $tol = min(0.10, 0.01 + 0.01 * $nlines); // rounding-level tolerance
+
+        $diffTtc = (float) price2num($exTtc - (float) $invoice->total_ttc);
+        if ($diffTtc == 0.0) {
+            return; // already exact
+        }
+        if (abs($diffTtc) > $tol) {
+            dol_syslog("UpInvoice reconcileTotals: gap ".$diffTtc." exceeds tolerance ".$tol.", left untouched", LOG_WARNING);
+            return; // too large: do not mask a real discrepancy
+        }
+
+        $invoice->fetch_lines();
+        if (empty($invoice->lines)) {
+            return;
+        }
+
+        // Prefer a VAT-bearing line to absorb a VAT/TTC cent; fall back to the largest line.
+        $target = null;
+        foreach ($invoice->lines as $ln) {
+            if ((float) $ln->tva_tx > 0 && ($target === null || (float) $ln->total_ht > (float) $target->total_ht)) {
+                $target = $ln;
+            }
+        }
+        $adjustVat = ($target !== null);
+        if ($target === null) {
+            foreach ($invoice->lines as $ln) {
+                if ($target === null || (float) $ln->total_ht > (float) $target->total_ht) {
+                    $target = $ln;
+                }
+            }
+        }
+        if ($target === null) {
+            return;
+        }
+
+        if ($adjustVat) {
+            // Keep line HT, move the cents into VAT and TTC (ht + tva = ttc stays valid)
+            $target->total_tva = (float) price2num((float) $target->total_tva + $diffTtc);
+            $target->total_ttc = (float) price2num((float) $target->total_ttc + $diffTtc);
+            $newTva = (float) price2num((float) $invoice->total_tva + $diffTtc);
+            $newHt  = (float) $invoice->total_ht;
+        } else {
+            // No VAT line: absorb into HT and TTC
+            $target->total_ht  = (float) price2num((float) $target->total_ht + $diffTtc);
+            $target->total_ttc = (float) price2num((float) $target->total_ttc + $diffTtc);
+            $newTva = (float) $invoice->total_tva;
+            $newHt  = (float) price2num((float) $invoice->total_ht + $diffTtc);
+        }
+        $target->update($user, 1);
+
+        // Set the invoice header totals (lines now sum to them) without re-running update_price
+        $invoice->total_ht  = $newHt;
+        $invoice->total_tva = $newTva;
+        $invoice->total_ttc = (float) price2num($exTtc);
+        $sql = "UPDATE ".MAIN_DB_PREFIX."facture_fourn SET";
+        $sql .= " total_ht = ".((float) $invoice->total_ht).",";
+        $sql .= " total_tva = ".((float) $invoice->total_tva).",";
+        $sql .= " total_ttc = ".((float) $invoice->total_ttc);
+        $sql .= " WHERE rowid = ".((int) $invoice->id);
+        $this->db->query($sql);
+        dol_syslog("UpInvoice reconcileTotals: absorbed ".$diffTtc." into line ".$target->id." (adjustVat=".($adjustVat ? 1 : 0).")", LOG_INFO);
     }
 
     /**

@@ -247,144 +247,78 @@ $morejs = array(
 );
 $morecss = array('/upinvoice/css/upinvoiceimport.css');
 
-// Page header
+// Page header — hide the left menu for a cleaner validation screen
+$conf->dol_hide_leftmenu = 1;
 llxHeader('', $langs->trans($page_name), $help_url, '', 0, 0, $morejs, $morecss);
 
 print load_fiche_titre($langs->trans($page_name), '', 'title_companies');
 
-// Display current file info
-print '<div class="upinvoiceimport-file-info">';
-
-print '<table class="noborder centpercent">';
-print '<tr class="oddeven">';
-print '<td width="50%">';
-//print '<strong>' . $langs->trans("FileName") . ':</strong> ' . dol_escape_htmltag($upinvoicefiles->original_filename) . '<div style="float:right"><button id="preview-doc-btn" class="butAction"><i class="fas fa-eye"></i> ' . $langs->trans("ViewDocument") . '</button></div><br>';
 $previewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
-print '<strong>' . $langs->trans("FileName") . ':</strong> ' . dol_escape_htmltag($upinvoicefiles->original_filename);
-print '<div style="float:right">';
-print '<button id="preview-doc-btn" class="butAction" ';
-print 'data-file-path="'.$previewUrl.'" ';
-print 'data-file-type="'.$upinvoicefiles->file_type.'" ';
-print 'data-file-name="'.$upinvoicefiles->original_filename.'">';
-print '<i class="fas fa-eye"></i> ' . $langs->trans("ViewDocument") . '</button>';
-print '</div><br>';
-print '<strong>' . $langs->trans("UploadDate") . ':</strong> ' . dol_print_date($upinvoicefiles->date_creation, 'dayhour') . '</td>';
-print '<td width="50%">';
-print '</td>';
-print '</tr>';
-print '</table>';
+$isPdfDoc = (strpos((string) $upinvoicefiles->file_type, 'pdf') !== false);
 
-print '</div>'; // Close file info
-
-// Datos de documento para vista previa
-$documentPreviewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
-print '<input type="hidden" id="document-preview-path" value="'.$documentPreviewUrl.'">';
-print '<input type="hidden" id="document-preview-type" value="'.$upinvoicefiles->file_type.'">';
-
-// Start container
 print '<div class="upinvoiceimport-container">';
+print '<div class="upinv-split">';
 
+// LEFT 50%: document viewer (replaces the old "View document" button)
+print '<div class="upinv-split-left">';
+if ($isPdfDoc) {
+    print '<iframe src="'.$previewUrl.'" class="upinv-doc-frame" title="'.dol_escape_htmltag($upinvoicefiles->original_filename).'"></iframe>';
+} else {
+    print '<div class="upinv-doc-imgwrap"><img src="'.$previewUrl.'" class="upinv-doc-img" alt="'.dol_escape_htmltag($upinvoicefiles->original_filename).'"></div>';
+}
+print '<div class="upinv-doc-foot opacitymedium small">'.dol_escape_htmltag($upinvoicefiles->original_filename).' &middot; '.dol_print_date($upinvoicefiles->date_creation, 'dayhour').'</div>';
+print '</div>'; // Close upinv-split-left
 
-print '<div class="fichecenter">';
-
-print '<div class="fichehalfleft">';
+// RIGHT 50%: detected data + search + create form
+print '<div class="upinv-split-right">';
 // Display supplier data from JSON
+// Collect non-empty detected fields (label => value)
+$detected = array();
+if (!empty($supplier_data['name']))         $detected[$langs->trans("Name")]     = $supplier_data['name'];
+if (!empty($supplier_data['idprof1']))      $detected[$langs->trans("ProfId1")]  = $supplier_data['idprof1'];
+if (!empty($supplier_data['tva_intra']))    $detected[$langs->trans("VATIntra")] = $supplier_data['tva_intra'];
+if (!empty($supplier_data['address']))      $detected[$langs->trans("Address")]  = $supplier_data['address'];
+if (!empty($supplier_data['zip']))          $detected[$langs->trans("Zip")]      = $supplier_data['zip'];
+if (!empty($supplier_data['town']))         $detected[$langs->trans("Town")]     = $supplier_data['town'];
+if (!empty($supplier_data['country_code'])) $detected[$langs->trans("Country")]  = getCountryLabel($supplier_data['country_code']);
+if (!empty($supplier_data['state']))        $detected[$langs->trans("State")]    = $supplier_data['state'];
+if (!empty($supplier_data['phone']))        $detected[$langs->trans("Phone")]    = $supplier_data['phone'];
+if (!empty($supplier_data['email']))        $detected[$langs->trans("Email")]    = $supplier_data['email'];
+
 print '<div class="upinvoiceimport-detected-data">';
-print '<table class="centpercent">';
-print '<tr class="liste_titre">';
-print '<td colspan="2">' . $langs->trans("DetectedSupplierData") . '</td>';
-print '</tr>';
 
-// Display each supplier field from the JSON data
-if (!empty($supplier_data['name'])) {
-    print '<tr class="oddeven">';
-    print '<td width="30%">' . $langs->trans("Name") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['name']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['idprof1'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("ProfId1") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['idprof1']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['tva_intra'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("VATIntra") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['tva_intra']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['address'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("Address") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['address']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['zip'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("Zip") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['zip']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['town'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("Town") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['town']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['country_code'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("Country") . '</td>';
-    print '<td>' . getCountryLabel($supplier_data['country_code']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['state'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("State") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['state']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['phone'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("Phone") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['phone']) . '</td>';
-    print '</tr>';
-}
-if (!empty($supplier_data['email'])) {
-    print '<tr class="oddeven">';
-    print '<td>' . $langs->trans("Email") . '</td>';
-    print '<td>' . dol_escape_htmltag($supplier_data['email']) . '</td>';
-    print '</tr>';
-}
-
-print '</table>';
-print '</div>'; // Close detected data
-
-print '</div>'; // Close fichehalfleft
-print '<div class="fichehalfright">';
-
-// Display supplier search form with live search
-print '<div class="upinvoiceimport-search-form">';
-print '<h2>' . $langs->trans("SearchSupplier") . '</h2>';
-print '<form id="supplier-search-form" method="GET" action="' . $_SERVER['PHP_SELF'] . '">';
+// Title bar with the supplier search inline on the right
+print '<div class="upinv-detected-title">';
+print '<span class="upinv-detected-title-text">' . $langs->trans("DetectedSupplierData") . '</span>';
+print '<form id="supplier-search-form" method="GET" action="' . $_SERVER['PHP_SELF'] . '" class="upinv-header-search">';
 print '<input type="hidden" name="token" value="' . newToken() . '">';
 print '<input type="hidden" id="file_id" name="file_id" value="' . $upinvoicefiles->id . '">';
-
-print '<div class="upinvoiceimport-search-inputs">';
-print '<div class="search-field search-field-full">';
-print '<label for="search_term">' . $langs->trans("Search") . '</label>';
-print '<input type="text" name="search_term" id="search_term" value="' . GETPOST('search_term') . '" placeholder="' . $langs->trans("SearchBy") . '">';
-print '</div>';
-print '<div class="search-field search-submit">';
-print '<button type="submit" class="button">' . $langs->trans("Search") . '</button>';
-print '</div>';
-print '</div>'; // Close search inputs
+print '<label for="search_term" style="display:none">' . $langs->trans("SearchSupplier") . '</label>';
+print '<input type="text" name="search_term" id="search_term" value="' . dol_escape_htmltag(GETPOST('search_term')) . '" placeholder="' . dol_escape_htmltag($langs->trans("SearchSupplier")) . '">';
+print '<button type="submit" class="button" title="' . dol_escape_htmltag($langs->trans("Search")) . '"><i class="fas fa-search"></i></button>';
 print '</form>';
+print '</div>'; // Close title bar
 
-// Container for search results
+print '<div class="upinv-detected-grid">';
+$splitAt = 5; // first 5 fields in column 1, the rest in column 2
+$idx = 0;
+print '<div class="upinv-detected-col">';
+foreach ($detected as $label => $value) {
+    if ($idx === $splitAt) {
+        print '</div><div class="upinv-detected-col">';
+    }
+    print '<div class="upinv-detected-row">';
+    print '<span class="upinv-dt-label">' . dol_escape_htmltag($label) . '</span>';
+    print '<span class="upinv-dt-value">' . dol_escape_htmltag($value) . '</span>';
+    print '</div>';
+    $idx++;
+}
+print '</div>'; // Close last column
+print '</div>'; // Close grid
+print '</div>'; // Close detected data
+
+// Container for live search results
 print '<div id="search-results-container"></div>';
-
-print '</div>'; // Close search form
 
 // If suppliers were found automatically, display them
 if (!empty($searchResults) && count($searchResults) > 1) {
@@ -423,12 +357,7 @@ if (!empty($searchResults) && count($searchResults) > 1) {
     print '</div>'; // Close search results
 }
 
-print '</div>'; // Close fichehalfright
-print '</div>'; // Close fichecenter
-print '<div class="clearboth"></div>';
-
-
-// If no suppliers found or user wants to create a new one, display creation form
+// Create new supplier form (compact, 2 columns)
 print '<div class="upinvoiceimport-create-form">';
 print '<h2>' . $langs->trans("CreateNewSupplier") . '</h2>';
 print '<form method="POST" action="' . $_SERVER['PHP_SELF'] . '">';
@@ -436,68 +365,53 @@ print '<input type="hidden" name="token" value="' . newToken() . '">';
 print '<input type="hidden" name="action" value="create_supplier">';
 print '<input type="hidden" name="file_id" value="' . $upinvoicefiles->id . '">';
 
-// Pre-fill form with data from JSON
-print '<table class="border centpercent">';
+// Pre-fill form with data from JSON (2-column compact grid)
+print '<div class="upinv-create-grid">';
 
-// Name (required)
-print '<tr>';
-print '<td class="titlefieldcreate fieldrequired">' . $langs->trans("Name") . '</td>';
-print '<td><input type="text" name="name" value="' . dol_escape_htmltag($supplier_data['name'] ?? '') . '" required></td>';
-print '</tr>';
+// Name (required, full width)
+print '<div class="upinv-field full"><label class="fieldrequired">' . $langs->trans("Name") . '</label>';
+print '<input type="text" name="name" value="' . dol_escape_htmltag($supplier_data['name'] ?? '') . '" required></div>';
 
 // Name alias
-print '<tr>';
-print '<td>' . $langs->trans("NameAlias") . '</td>';
-print '<td><input type="text" name="name_alias" value="' . dol_escape_htmltag($supplier_data['name_alias'] ?? '') . '"></td>';
-print '</tr>';
+print '<div class="upinv-field"><label>' . $langs->trans("NameAlias") . '</label>';
+print '<input type="text" name="name_alias" value="' . dol_escape_htmltag($supplier_data['name_alias'] ?? '') . '"></div>';
 
 // Tax ID
-print '<tr>';
-print '<td>' . $langs->trans("ProfId1") . '</td>';
-print '<td><input type="text" name="idprof1" value="' . dol_escape_htmltag($supplier_data['idprof1'] ?? '') . '"></td>';
-print '</tr>';
+print '<div class="upinv-field"><label>' . $langs->trans("ProfId1") . '</label>';
+print '<input type="text" name="idprof1" value="' . dol_escape_htmltag($supplier_data['idprof1'] ?? '') . '"></div>';
 
 // VAT Intra
-print '<tr>';
-print '<td>' . $langs->trans("VATIntra") . '</td>';
-print '<td><input type="text" name="tva_intra" value="' . dol_escape_htmltag($supplier_data['tva_intra'] ?? '') . '"></td>';
-print '</tr>';
+print '<div class="upinv-field"><label>' . $langs->trans("VATIntra") . '</label>';
+print '<input type="text" name="tva_intra" value="' . dol_escape_htmltag($supplier_data['tva_intra'] ?? '') . '"></div>';
 
-// Address
-print '<tr>';
-print '<td>' . $langs->trans("Address") . '</td>';
-print '<td><input type="text" name="address" value="' . dol_escape_htmltag($supplier_data['address'] ?? '') . '"></td>';
-print '</tr>';
+// Phone
+print '<div class="upinv-field"><label>' . $langs->trans("Phone") . '</label>';
+print '<input type="text" name="phone" value="' . dol_escape_htmltag($supplier_data['phone'] ?? '') . '"></div>';
+
+// Address (full width)
+print '<div class="upinv-field full"><label>' . $langs->trans("Address") . '</label>';
+print '<input type="text" name="address" value="' . dol_escape_htmltag($supplier_data['address'] ?? '') . '"></div>';
 
 // Zip
-print '<tr>';
-print '<td>' . $langs->trans("Zip") . '</td>';
-print '<td><input type="text" name="zip" value="' . dol_escape_htmltag($supplier_data['zip'] ?? '') . '"></td>';
-print '</tr>';
+print '<div class="upinv-field"><label>' . $langs->trans("Zip") . '</label>';
+print '<input type="text" name="zip" value="' . dol_escape_htmltag($supplier_data['zip'] ?? '') . '"></div>';
 
 // Town
-print '<tr>';
-print '<td>' . $langs->trans("Town") . '</td>';
-print '<td><input type="text" name="town" value="' . dol_escape_htmltag($supplier_data['town'] ?? '') . '"></td>';
-print '</tr>';
+print '<div class="upinv-field"><label>' . $langs->trans("Town") . '</label>';
+print '<input type="text" name="town" value="' . dol_escape_htmltag($supplier_data['town'] ?? '') . '"></div>';
 
 // Country
-print '<tr>';
-print '<td>' . $langs->trans("Country") . '</td>';
-print '<td>';
+print '<div class="upinv-field"><label>' . $langs->trans("Country") . '</label>';
 $selectedCountry = $supplier_data['country_code'] ?? '';
 print $form->select_country($selectedCountry, 'country_code', '', 0, 'minwidth300');
-print '</td>';
-print '</tr>';
+print '</div>';
 
-// State
-print '<tr id="state_tr">';
-print '<td>' . $langs->trans("State") . '</td>';
-print '<td id="state_td">';
+// State (ids preserved for the country->state JS)
+print '<div class="upinv-field" id="state_tr"><label>' . $langs->trans("State") . '</label>';
+print '<span id="state_td">';
 $selectedState = $supplier_data['state'] ?? '';
 print $formcompany->select_state($selectedState, $supplier_data['country_code'] ?? '');
-print '</td>';
-print '</tr>';
+print '</span></div>';
 
 if (!empty($supplier_data['state'])) {
     ?>
@@ -536,27 +450,22 @@ if (!empty($supplier_data['state'])) {
     <?php
 }
 
-// Phone
-print '<tr>';
-print '<td>' . $langs->trans("Phone") . '</td>';
-print '<td><input type="text" name="phone" value="' . dol_escape_htmltag($supplier_data['phone'] ?? '') . '"></td>';
-print '</tr>';
+// Email (full width)
+print '<div class="upinv-field full"><label>' . $langs->trans("Email") . '</label>';
+print '<input type="email" name="email" value="' . dol_escape_htmltag($supplier_data['email'] ?? '') . '"></div>';
 
-// Email
-print '<tr>';
-print '<td>' . $langs->trans("Email") . '</td>';
-print '<td><input type="email" name="email" value="' . dol_escape_htmltag($supplier_data['email'] ?? '') . '"></td>';
-print '</tr>';
-
-print '</table>';
+print '</div>'; // Close upinv-create-grid
 
 // Submit button
-print '<div class="center">';
-print '<input type="submit" class="button" value="' . $langs->trans("CreateSupplier") . '">';
+print '<div class="upinv-form-actions">';
+print '<input type="submit" class="button upinv-btn-green" value="' . $langs->trans("CreateSupplier") . '">';
 print '</div>';
 
 print '</form>';
 print '</div>'; // Close create form
+
+print '</div>'; // Close upinv-split-right
+print '</div>'; // Close upinv-split
 
 // Close container
 print '</div>';

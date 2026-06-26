@@ -35,7 +35,7 @@ class modUpInvoice extends DolibarrModules
         $this->descriptionlong = "This module allows to upload, validate and register supplier invoices in a three steps process";
         $this->editor_name = "UpInvoice.eu";
         $this->editor_url = "https://upinvoice.eu";
-        $this->version = '1.2.0';
+        $this->version = '1.3.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';
 
@@ -66,6 +66,33 @@ class modUpInvoice extends DolibarrModules
                 0,
                 'current',
                 1
+            ),
+            2 => array(
+                'UPINVOICE_EMAILCOLLECTOR_ENABLED',
+                'chaine',
+                '0',
+                'Enable UpInvoice operation for EmailCollector (import invoice attachments from emails)',
+                0,
+                'current',
+                1
+            ),
+            3 => array(
+                'UPINVOICE_AUTO_AI_PROCESSING',
+                'chaine',
+                '0',
+                'Enable automatic AI processing of pending files by cron',
+                0,
+                'current',
+                1
+            ),
+            4 => array(
+                'UPINVOICE_EMAIL_MAX_FILE_SIZE',
+                'chaine',
+                '10485760',
+                'Maximum size in bytes for an email attachment to be imported (default 10 MB)',
+                0,
+                'current',
+                1
             )
         );
 
@@ -83,7 +110,27 @@ class modUpInvoice extends DolibarrModules
         // Document access configuration
         $this->module_parts = array(
             'dir' => array('output' => 'upinvoice'),
-            'modulepart' => array('upinvoice' => 'upinvoice')
+            'modulepart' => array('upinvoice' => 'upinvoice'),
+            // 'emailcolector' (sic): core EmailCollector dispatches hook operations with this misspelled context
+            'hooks' => array('emailcollectorcard', 'emailcolector')
+        );
+
+        // Scheduled jobs
+        $this->cronjobs = array(
+            0 => array(
+                'label' => 'UpInvoice AI queue processing',
+                'priority' => 51,
+                'jobtype' => 'method',
+                'class' => '/upinvoice/class/upinvoicefiles.class.php',
+                'objectname' => 'UpInvoiceFiles',
+                'method' => 'processPendingAiBatch',
+                'parameters' => '5',
+                'comment' => 'Process pending UpInvoice files (queued manually or from email attachments) with the AI API',
+                'frequency' => 5,
+                'unitfrequency' => 60,
+                'status' => 1,
+                'test' => 'isModEnabled("upinvoice") && getDolGlobalString("UPINVOICE_AUTO_AI_PROCESSING")'
+            )
         );
 
         $this->picto = 'upinvoice@upinvoice';

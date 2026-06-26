@@ -7,6 +7,29 @@
     margin-bottom: 30px;
 }
 
+/* Top bar: UpInvoice logo + live credits/plan bar */
+.upinv-topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 8px 0 14px;
+}
+.upinv-logo {
+    height: 40px;
+    width: auto;
+    display: block;
+}
+.upinv-credits {
+    flex: 1;
+    padding: 6px 12px;
+    background: #f8f8f8;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 /* Message notifications */
 .upinvoiceimport-messages {
     margin-bottom: 20px;
@@ -1194,7 +1217,7 @@ input.totalttcline {
     border-top: none;
     border-bottom-left-radius: 0.25rem;
     border-bottom-right-radius: 0.25rem;
-    padding: 20px;
+    padding: 1px 20px 20px;
     background-color: #fff;
     box-shadow: 0px -2px 1px -1px rgba(0,0,0,.5);
 }
@@ -1885,6 +1908,16 @@ input.totalttcline {
     transition: stroke-dashoffset 0.3s ease;
 }
 
+@keyframes pulse-processing {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.processing-pulse {
+    animation: pulse-processing 1.5s infinite ease-in-out;
+}
+
 .upload-preview-item-compact .status-icon {
     font-size: 1em;
     display: none;
@@ -1922,4 +1955,791 @@ input.totalttcline {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* ==========================================================================
+   Pending files tab: toolbar, selection, indeterminate progress, toasts
+   ========================================================================== */
+
+/* Count badge in the tab label */
+.upinvoice-count-badge:empty {
+    display: none;
+}
+.upinvoice-count-badge {
+    display: inline-block;
+    min-width: 18px;
+    padding: 1px 6px;
+    margin-left: 4px;
+    font-size: 0.75em;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+    color: #fff;
+    background: #17a2b8;
+    border-radius: 10px;
+    vertical-align: middle;
+}
+
+/* Toolbar (mirrors the emails-filters layout) */
+.upinvoice-files-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.upinvoice-files-toolbar #files-search {
+    min-width: 220px;
+    padding-left: 26px;
+}
+.upinvoice-sort-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.upinvoice-files-toolbar-right {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+/* Paused state of the queue toggle */
+#queue-toggle-btn.is-paused {
+    color: #b26a00;
+    border-color: #f0d9a8;
+    background: #fff4e0;
+}
+
+/* Plain-words "what is this card waiting for" hint */
+.file-next-action {
+    font-size: 0.78em;
+    color: #1976d2;
+    padding: 7px 15px 0;
+}
+.file-next-action i {
+    margin-right: 4px;
+    opacity: 0.8;
+}
+
+/* Footer row: next-action hint (left) in line with the action buttons (right) */
+.file-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 15px 12px;
+}
+.file-card-footer .file-next-action {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.file-card-footer .file-actions {
+    flex-shrink: 0;
+    padding: 0;
+    margin-top: 0;
+}
+
+/* Stuck badge reuses .badge-warning (amber) */
+.badge-warning i {
+    margin-right: 3px;
+}
+
+/* Indeterminate progress bar (honest: the AI call has no real progress events) */
+.progress-indeterminate {
+    position: relative;
+    overflow: hidden;
+}
+.progress-indeterminate .progress-bar {
+    position: absolute;
+    width: 40%;
+    height: 100%;
+    background-color: #007bff;
+    animation: upinvoice-indeterminate 1.2s ease-in-out infinite;
+}
+@keyframes upinvoice-indeterminate {
+    0%   { left: -40%; }
+    100% { left: 100%; }
+}
+
+/* Toast stack (notifications no longer overwrite each other) */
+#upload-results {
+    position: fixed;
+    top: 70px;
+    right: 18px;
+    z-index: 2000;
+    width: 340px;
+    max-width: calc(100vw - 36px);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+#upload-results .alert {
+    pointer-events: auto;
+    margin-bottom: 0;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+    animation: upinvoice-toast-in 0.25s ease-out;
+    /* Compact toast: ~half the default height */
+    padding: 0.35rem 0.6rem;
+    padding-right: 1.9rem;
+    font-size: 0.85em;
+    line-height: 1.25;
+}
+/* Half-size close button */
+#upload-results .alert .close {
+    font-size: 1rem;
+    line-height: 1;
+    padding: 3px 5px;
+}
+@keyframes upinvoice-toast-in {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+@media (max-width: 767px) {
+    .upinvoice-files-toolbar-right {
+        margin-left: 0;
+    }
+    #upload-results {
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+}
+
+/* ==========================================================================
+   Email tab styles
+   ========================================================================== */
+
+/* Attachment chip */
+.upinvoice-attach-chip {
+    display: inline-block;
+    background: #e8f0fe;
+    color: #1a56db;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-size: 0.82em;
+    margin: 1px 2px 1px 0;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.upinvoice-attach-chip.upinvoice-chip-imported {
+    background: #e6f4ea;
+    color: #2e7d32;
+}
+
+/* Blacklisted attachment: shown disabled, no actions */
+.upinvoice-attach-chip.upinvoice-chip-blacklisted {
+    background: #f0f0f0;
+    color: #999;
+    text-decoration: line-through;
+    opacity: 0.8;
+}
+.upinvoice-rule-tag.upinvoice-rule-tag-blacklist {
+    background: #f5f5f5;
+    color: #9e9e9e;
+    border: 1px solid #e0e0e0;
+}
+
+/* Ignored non-PDF attachment (email carries a PDF): shown disabled, no actions */
+.upinvoice-attach-chip.upinvoice-chip-ignored {
+    background: #f4f4f4;
+    color: #aaa;
+    opacity: 0.85;
+}
+.upinvoice-rule-tag.upinvoice-rule-tag-ignored {
+    background: #f5f5f5;
+    color: #9e9e9e;
+    border: 1px solid #e0e0e0;
+}
+
+/* Per-attachment import action inside a pending chip */
+.upinvoice-chip-import-btn {
+    color: inherit;
+    opacity: 0.55;
+    margin-left: 4px;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+.upinvoice-chip-import-btn:hover {
+    opacity: 1;
+}
+
+/* Emails search + status filter bar */
+.upinvoice-emails-filters {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+.upinvoice-search-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.upinvoice-search-wrap i.fa-search {
+    position: absolute;
+    left: 8px;
+    opacity: 0.45;
+    pointer-events: none;
+}
+.upinvoice-emails-filters #emails-search {
+    min-width: 240px;
+    padding-left: 26px;
+}
+.upinvoice-status-filters {
+    display: inline-flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+/* Right-aligned group: refresh + updated-hint + auto-refresh */
+.upinvoice-filters-right {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Empty / loading / error states for the email list */
+.upinvoice-empty-state {
+    text-align: center;
+    padding: 32px 12px;
+    color: #888;
+}
+.upinvoice-empty-state i {
+    font-size: 2.4em;
+    opacity: 0.35;
+    display: block;
+    margin-bottom: 8px;
+}
+.upinvoice-empty-state p {
+    margin: 0;
+}
+.upinvoice-empty-state.is-error {
+    color: #b3261e;
+}
+.upinvoice-empty-state.is-error i {
+    opacity: 0.55;
+}
+.button-statusfilter {
+    opacity: 0.55;
+}
+.button-statusfilter.active {
+    opacity: 1;
+    font-weight: bold;
+}
+
+/* Emails list toolbar (summary + bulk import) */
+.upinvoice-emails-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.upinvoice-emails-summary {
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+/* Already imported badge inside chip */
+.upinvoice-badge-imported {
+    font-size: 0.75em;
+    vertical-align: middle;
+    margin-left: 3px;
+}
+
+/* Row where all attachments are already imported */
+.upinvoice-email-imported-row td {
+    opacity: 0.65;
+}
+
+/* Fully processed email: dimmed, nothing left to do */
+tr.upinvoice-email-processed td {
+    opacity: 0.5;
+    background: #fafafa;
+}
+tr.upinvoice-email-processed .upinvoice-attach-chip {
+    background: #eee;
+    color: #777;
+}
+
+/* Rule form */
+.upinvoice-rule-form label {
+    font-size: 0.85em;
+    color: #555;
+}
+
+/* Collapsible rules section */
+.upinvoice-rules-toggle {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.upinvoice-rules-toggle .toggle-caret {
+    font-size: 0.8em;
+    opacity: 0.6;
+    transition: transform 0.12s ease;
+}
+.upinvoice-rules-toggle:hover {
+    color: #1a56db;
+}
+
+/* "Test rule" dry-run result */
+.upinvoice-rule-test-result {
+    margin-bottom: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: #e8f0fe;
+    color: #1a56db;
+    font-size: 0.88em;
+}
+.upinvoice-rule-test-result.is-error {
+    background: #fdecea;
+    color: #b3261e;
+}
+
+/* Emails table layout */
+.upinvoice-emails-table td,
+.upinvoice-emails-table th {
+    vertical-align: middle;
+}
+
+/* Source origin badge (email, etc.) */
+.upinvoice-source-badge {
+    display: inline-block;
+    font-size: 0.78em;
+    border-radius: 3px;
+    padding: 1px 5px;
+    vertical-align: middle;
+    font-weight: 500;
+}
+.upinvoice-source-email {
+    background: #e8f0fe;
+    color: #1a56db;
+    border: 1px solid #c5d8fc;
+}
+
+/* Auto-import rule tag (which rule queued / will queue a file) */
+.upinvoice-rule-tag {
+    display: inline-block;
+    font-size: 0.76em;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin: 1px 2px 1px 0;
+    vertical-align: middle;
+    background: #ede7f6;
+    color: #5e35b1;
+    border: 1px solid #d6ccec;
+    white-space: nowrap;
+}
+/* Forward-looking tag: a rule WILL auto-import this attachment */
+.upinvoice-rule-tag-auto {
+    background: #fff4e0;
+    color: #b26a00;
+    border: 1px solid #f0d9a8;
+}
+
+/* ============================================================== */
+/* Invoice validation screen: document viewer (left) + form (right) */
+/* ============================================================== */
+.upinv-split {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+}
+.upinv-split-left {
+    flex: 0 0 48%;
+    max-width: 48%;
+    position: sticky;
+    top: 12px;
+}
+.upinv-split-right {
+    flex: 1 1 52%;
+    min-width: 0;
+}
+.upinv-doc-frame {
+    width: 100%;
+    height: calc(100vh - 140px);
+    min-height: 460px;
+    border: 1px solid #d5d5d5;
+    border-radius: 6px;
+    background: #fff;
+}
+.upinv-doc-imgwrap {
+    width: 100%;
+    height: calc(100vh - 140px);
+    min-height: 460px;
+    overflow: auto;
+    border: 1px solid #d5d5d5;
+    border-radius: 6px;
+    background: #fafafa;
+    text-align: center;
+}
+.upinv-doc-img {
+    max-width: 100%;
+    height: auto;
+}
+.upinv-doc-foot {
+    margin-top: 4px;
+}
+
+/* Compact supplier strip */
+.upinv-supplier-strip {
+    padding: 6px 10px;
+    background: #f3f4f6;
+    border: 1px solid #e3e3e3;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+.upinv-supplier-name {
+    font-weight: bold;
+}
+.upinv-link {
+    cursor: pointer;
+}
+
+/* Compact header + totals tables */
+.upinv-form table.border > tbody > tr > td,
+.upinv-totals > tbody > tr > td {
+    padding: 3px 6px;
+}
+.upinv-form table.border td.titlefieldcreate,
+.upinv-form table.border td.fieldrequired,
+.upinv-form table.border > tbody > tr > td:first-child {
+    width: 34%;
+}
+.upinv-form textarea.quatrevingtpercent {
+    width: 98%;
+}
+
+/* Compact invoice lines table inside the right column */
+.upinv-split-right #invoice_lines_table th,
+.upinv-split-right #invoice_lines_table td {
+    padding: 3px 4px;
+    vertical-align: middle;
+}
+.upinv-split-right #invoice_lines_table .linecoldescription.minwidth300imp {
+    min-width: 0 !important;
+}
+.upinv-split-right #invoice_lines_table input {
+    box-sizing: border-box;
+    padding: 2px 4px;
+}
+.upinv-split-right #invoice_lines_table input.tvaline,
+.upinv-split-right #invoice_lines_table input.qtyline,
+.upinv-split-right #invoice_lines_table input.remisepercentline {
+    width: 52px;
+}
+.upinv-split-right #invoice_lines_table input.puhline,
+.upinv-split-right #invoice_lines_table input.totalhtline,
+.upinv-split-right #invoice_lines_table input.totalvaline,
+.upinv-split-right #invoice_lines_table input.totalttcline {
+    width: 74px;
+}
+.upinv-split-right #invoice_lines_table textarea {
+    font-size: 0.85em;
+}
+/* Type select + product search side by side; matched label below both */
+.upinv-split-right .product-type-selector {
+    display: inline-block;
+    width: 92px;
+    margin-right: 6px;
+    margin-bottom: 5px;
+    vertical-align: top;
+}
+.upinv-split-right .product-select-container {
+    display: inline-block;
+    width: calc(100% - 102px);
+    vertical-align: top;
+}
+.upinv-split-right .product-match-info {
+    display: block;
+    clear: both;
+}
+
+/* Product search (Select2) styled like the other fields */
+.upinv-split-right .select2-container--default .select2-selection--single {
+    border: 1px solid #cdd2d8;
+    border-radius: 3px;
+    height: 28px;
+    background-color: #fff;
+}
+.upinv-split-right .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 26px;
+    padding-left: 6px;
+}
+.upinv-split-right .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 26px;
+}
+
+/* Full border + slight radius on the fields (instead of bottom-only underline) */
+.upinv-split-right input[type="text"],
+.upinv-split-right input[type="number"],
+.upinv-split-right textarea,
+.upinv-split-right select,
+.upinv-form input[type="text"],
+.upinv-form textarea,
+.upinv-form select {
+    border: 1px solid #cdd2d8;
+    border-radius: 3px;
+    padding: 3px 6px;
+    background-color: #fff;
+}
+.upinv-split-right input[readonly] {
+    background-color: #f5f5f5;
+}
+
+/* Drop the gray framed card around the lines table */
+.upinv-split-right .upinvoiceimport-invoice-card {
+    background: none;
+    border: 0;
+    margin: 8px 0 0 0;
+}
+.upinv-split-right .upinvoiceimport-card-body {
+    padding: 0;
+}
+
+/* "Add line" compact, aligned to the bottom-right of the lines, pulled up close */
+.upinv-split-right #invoice_lines_table {
+    margin-bottom: 0;
+}
+.upinv-split-right .invoice-actions {
+    margin-top: 0;
+    text-align: right;
+}
+.upinv-split-right .invoice-actions a {
+    margin: 0;
+}
+
+/* Action button colors */
+.upinv-btn-amber {
+    background: #e0a800 !important;
+    border-color: #d39e00 !important;
+    color: #fff !important;
+}
+.upinv-btn-green {
+    background: #2e7d32 !important;
+    border-color: #2e7d32 !important;
+    color: #fff !important;
+}
+a.upinv-btn-blue {
+    background: #1976d2 !important;
+    border-color: #1976d2 !important;
+    color: #fff !important;
+}
+.upinv-btn-sm {
+    font-size: 0.82em !important;
+    padding: 3px 9px !important;
+}
+
+/* VAT recalc method toggle + reconciliation box (invoice validation) */
+/* Totals label column: fit content so "Método 2" never wraps */
+.upinv-form table.upinv-totals td:first-child {
+    width: 1% !important;
+    white-space: nowrap;
+}
+.upinv-recalc {
+    font-weight: normal;
+    white-space: nowrap;
+    margin-left: 6px;
+}
+.upinv-method-btn {
+    text-decoration: none;
+    padding: 0 5px;
+    border-radius: 3px;
+}
+.upinv-method-btn.active {
+    background: #1976d2;
+    color: #fff;
+    font-weight: 600;
+}
+.upinv-reconcile {
+    margin-top: 8px;
+    padding: 7px 10px;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+.upinv-reconcile.upinv-ok {
+    background: #e6f4ea;
+    color: #2e7d32;
+    border: 1px solid #bfe3c6;
+}
+.upinv-reconcile.upinv-adjusted {
+    background: #fff4e0;
+    color: #b26a00;
+    border: 1px solid #f0d9a8;
+}
+.upinv-reconcile.upinv-mismatch {
+    background: #fdecea;
+    color: #b3261e;
+    border: 1px solid #f5c2bd;
+}
+.upinv-reconcile div {
+    margin: 1px 0;
+}
+
+/* Submit buttons row: Cancel left, create actions right (validate far right) */
+.upinv-form-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+.upinv-form-actions .upinv-cancel {
+    margin-right: auto;
+}
+
+/* Supplier: single-line search */
+.upinv-search-line {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.upinv-search-line input[type="text"] {
+    flex: 1;
+}
+/* Search results flow normally (not an absolute dropdown) so they don't overlap the create form */
+.upinv-split-right .upinvoiceimport-search-results {
+    position: static;
+    top: auto;
+    margin: 10px 0 16px;
+    background: #fff;
+}
+.upinv-split-right #search-results-container {
+    margin-top: 8px;
+}
+
+/* Detected supplier data: 2 columns, clear label vs value */
+.upinv-detected-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #eef0f3;
+    padding: 5px 9px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+.upinv-detected-title-text {
+    font-weight: bold;
+    flex: 0 0 auto;
+}
+.upinv-header-search {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.upinv-header-search input[type="text"] {
+    width: 230px;
+    max-width: 40vw;
+}
+.upinv-detected-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 22px;
+    margin-bottom: 14px;
+}
+.upinv-detected-col {
+    display: flex;
+    flex-direction: column;
+}
+.upinv-detected-row {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px dotted #e6e6e6;
+}
+.upinv-dt-label {
+    flex: 0 0 38%;
+    color: #8a8f98;
+    font-size: 0.88em;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    align-self: center;
+}
+.upinv-dt-value {
+    flex: 1;
+    font-weight: 600;
+    color: #1f2937;
+    word-break: break-word;
+}
+@media (max-width: 1100px) {
+    .upinv-detected-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Supplier: 2-column compact create form */
+.upinv-create-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 14px;
+}
+.upinv-create-grid .upinv-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.upinv-create-grid .upinv-field.full {
+    grid-column: 1 / -1;
+}
+.upinv-create-grid label {
+    font-size: 0.85em;
+    color: #555;
+    margin-bottom: 2px;
+}
+.upinv-create-grid input,
+.upinv-create-grid select {
+    width: 100%;
+    box-sizing: border-box;
+}
+.upinv-create-grid .select2-container {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+.upinv-split-right .upinvoiceimport-search-form h2,
+.upinv-split-right .upinvoiceimport-create-form h2 {
+    font-size: 1.1em;
+    margin: 10px 0 6px;
+}
+/* Breathing room to the right of the description column */
+.upinv-split-right #invoice_lines_table tr.invoice-line > td:first-child {
+    padding-right: 14px;
+}
+
+/* Stack vertically on narrow screens */
+@media (max-width: 1100px) {
+    .upinv-split {
+        flex-direction: column;
+    }
+    .upinv-split-left,
+    .upinv-split-right {
+        flex: 1 1 100%;
+        max-width: 100%;
+        position: static;
+    }
+    .upinv-doc-frame,
+    .upinv-doc-imgwrap {
+        height: 60vh;
+    }
+    .upinv-create-grid {
+        grid-template-columns: 1fr;
+    }
 }

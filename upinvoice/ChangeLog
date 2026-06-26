@@ -1,3 +1,16 @@
+1.3.0 (2026-06-19)
+- Pending files toolbar: search, status filter, sort, pause/resume queue, retry errors, refresh
+- Auto-polling every 20 s keeps the list up to date without manual reload
+- Honest indeterminate progress bar replaces simulated percentage
+- Stacked, compact toast notifications (append, not replace)
+- Optimistic fade-out on delete; card slides up on success, restores on failure
+- Credit-consumed warning when deleting an already-processed file
+- Removed bulk-selection bar (processing is fully automatic)
+- Stuck-file detection (configurable via UPINVOICE_STUCK_SECONDS, default 180 s)
+- Fix: modal confirm button was closing dialog before resolving, silently cancelling the action
+- Fix: Gemini 503 responses no longer overwrite valid api_json with empty data
+- Fix: missing es_ES translations for Saving and Supplier keys
+
 1.2.0 (2025-11-08)
 - Check max_input_vars PHP configuration to prevent data loss on large invoices
 - Improved amount format handling with better validation and normalization
