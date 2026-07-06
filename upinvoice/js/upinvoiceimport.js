@@ -697,6 +697,9 @@ var UpInvoiceModal = {
 // Function to load and display files list.
 // Pass silent=true (used by the auto-refresh poller) to skip the loading indicator
 // so the periodic refresh does not flicker.
+// Current page of the finished-files list (server-side pagination)
+var upinvFinishedPage = 1;
+
 function loadFilesList(silent) {
     if (typeof upinvoiceimport_active_tab === 'undefined') {
         // Estamos en otra página (invoice.php o supplier.php), no necesitamos cargar la lista
@@ -730,7 +733,8 @@ function loadFilesList(silent) {
         type: 'GET',
         data: {
             token: upinvoiceimport_token,
-            file_type: upinvoiceimport_active_tab // 'pending' or 'finished'
+            file_type: upinvoiceimport_active_tab, // 'pending' or 'finished'
+            page: (upinvoiceimport_active_tab === 'finished') ? upinvFinishedPage : 1
         },
         success: function(response) {
             try {
@@ -779,6 +783,12 @@ function loadFilesList(silent) {
                             updatePendingCount(typeof result.count !== 'undefined' ? result.count : null);
                             // Re-apply the active search / status filter / sort to the fresh list
                             applyPendingFilters();
+                        } else {
+                            // Sync the current page with the server (it clamps out-of-range pages)
+                            if (typeof result.page !== 'undefined') {
+                                upinvFinishedPage = result.page;
+                            }
+                            renderFinishedPagination(result);
                         }
 
                         // Start automatic processing if we're in the pending tab and not already processing
@@ -831,6 +841,33 @@ function loadFilesList(silent) {
             // Eliminar los indicadores de carga
             $('.info-box, .loading-indicator').remove();
         }
+    });
+}
+
+// Render prev/next + page indicator for the finished-files table
+function renderFinishedPagination(result) {
+    var $p = $('#finished-files-pagination');
+    if (!$p.length) return;
+
+    var page = result.page || 1;
+    var pages = result.total_pages || 1;
+    var total = typeof result.total !== 'undefined' ? result.total : null;
+
+    if (pages <= 1) { $p.empty().hide(); return; }
+
+    var html = '<button type="button" class="button button-pagelist" data-page="' + (page - 1) + '"'
+        + (page <= 1 ? ' disabled' : '') + ' aria-label="prev"><i class="fas fa-chevron-left"></i></button>';
+    html += '<span style="margin:0 10px;">' + page + ' / ' + pages
+        + (total !== null ? ' <span class="opacitymedium">(' + total + ')</span>' : '') + '</span>';
+    html += '<button type="button" class="button button-pagelist" data-page="' + (page + 1) + '"'
+        + (page >= pages ? ' disabled' : '') + ' aria-label="next"><i class="fas fa-chevron-right"></i></button>';
+
+    $p.html(html).show();
+    $p.off('click', '.button-pagelist').on('click', '.button-pagelist', function() {
+        var target = parseInt($(this).data('page'), 10);
+        if (isNaN(target) || target < 1 || target > pages || target === upinvFinishedPage) return;
+        upinvFinishedPage = target;
+        loadFilesList();
     });
 }
 

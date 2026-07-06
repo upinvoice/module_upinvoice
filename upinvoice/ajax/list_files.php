@@ -79,6 +79,16 @@ if (!in_array($fileType, array('pending', 'finished'))) {
     $fileType = 'pending'; // Default to pending
 }
 
+// Pagination (only used for the finished list; pending keeps the full grid for client-side filters)
+$page = GETPOSTINT('page');
+if ($page < 1) {
+    $page = 1;
+}
+$limit = GETPOSTINT('limit');
+if ($limit <= 0 || $limit > 100) {
+    $limit = !empty($conf->liste_limit) ? (int) $conf->liste_limit : 25;
+}
+
 // Seconds after which a file flagged as "processing" is considered stuck (configurable)
 $stuckSeconds = getDolGlobalInt('UPINVOICE_STUCK_SECONDS', 180);
 if ($stuckSeconds < 30) {
@@ -99,11 +109,27 @@ if ($fileType === 'pending') {
     $sql .= " ORDER BY f.date_creation DESC";
 } else {
     // Finished files: Have fk_invoice - Join with invoice and supplier tables for additional data
+    $sqlWhere = " WHERE f.entity = " . $conf->entity;
+    $sqlWhere .= " AND f.fk_invoice IS NOT NULL AND f.fk_invoice > 0";
+
+    // Total count for pagination (before applying LIMIT)
+    $totalFinished = 0;
+    $resCount = $db->query("SELECT COUNT(f.rowid) as nb FROM " . MAIN_DB_PREFIX . "upinvoice_files as f" . $sqlWhere);
+    if ($resCount) {
+        $objCount = $db->fetch_object($resCount);
+        $totalFinished = (int) $objCount->nb;
+        $db->free($resCount);
+    }
+    $totalPages = max(1, (int) ceil($totalFinished / $limit));
+    if ($page > $totalPages) {
+        $page = $totalPages; // Clamp (e.g. after deleting the last row of the last page)
+    }
+
     $sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "facture_fourn as ff ON f.fk_invoice = ff.rowid";
     $sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_supplier = s.rowid";
-    $sql .= " WHERE f.entity = " . $conf->entity;
-    $sql .= " AND f.fk_invoice IS NOT NULL AND f.fk_invoice > 0";
+    $sql .= $sqlWhere;
     $sql .= " ORDER BY f.date_modification DESC"; // Order by modification date (when invoice was created)
+    $sql .= $db->plimit($limit, ($page - 1) * $limit);
 }
 
 $resql = $db->query($sql);
@@ -464,6 +490,14 @@ $result = array(
     'html' => $html,
     'count' => count($files)
 );
+
+// Pagination info for the finished list
+if ($fileType === 'finished') {
+    $result['total'] = $totalFinished;
+    $result['page'] = $page;
+    $result['total_pages'] = $totalPages;
+    $result['limit'] = $limit;
+}
 
 echo json_encode($result);
 exit;

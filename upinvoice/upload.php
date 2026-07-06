@@ -335,6 +335,9 @@ print '</tr>';
 print '<tbody id="finished-files-list"></tbody>';
 print '</table>';
 
+// Paginación (renderizada por JS con los datos que devuelve list_files.php)
+print '<div id="finished-files-pagination" class="center" style="margin-top:10px;"></div>';
+
 print '</div>';
 print '</div>'; // End finished files tab
 
