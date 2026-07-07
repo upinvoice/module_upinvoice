@@ -274,6 +274,7 @@ UpInvoiceEmailCollectorEnabled=Activer la réception par email (EmailCollector)
 UpInvoiceEmailCollectorEnabledHelp=Ajoute une opération au module EmailCollector pour récupérer les pièces jointes PDF d´une boîte mail et les mettre en file dans UpInvoice pour traitement par IA
 UpInvoiceAutoAiProcessing=Traitement automatique par IA (documents par email)
 UpInvoiceAutoAiProcessingHelp=Une tâche planifiée traite automatiquement uniquement les fichiers reçus par email. Les fichiers uploadés manuellement restent en attente jusqu´à ce que l´utilisateur clique sur "Traiter".
+UpInvoiceAutoAiRequiresIntake=Nécessite la réception par email : activez le module EmailCollector et l´option de réception par email ci-dessus. Cette tâche ne traite que les fichiers reçus par email.
 UpInvoiceSeeCronJobs=Voir les tâches planifiées
 UpInvoiceEmailMinFileSize=Taille minimale de la pièce jointe (octets)
 UpInvoiceEmailMinFileSizeHelp=Les pièces jointes plus petites que cette taille sont ignorées (filtre les images de signature)

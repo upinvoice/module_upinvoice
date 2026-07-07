@@ -226,18 +226,37 @@ print '<tr class="liste_titre">';
 print '<td colspan="3">' . $langs->trans("UpInvoiceEmailIntakeSection") . '</td>';
 print '</tr>';
 
-// Enable EmailCollector operation
+// Enable EmailCollector operation. The toggle is only operable when the
+// EmailCollector module is enabled; otherwise show the effective (off) state
+// and the call-to-action to enable the prerequisite right where the user decides.
 print '<tr class="oddeven">';
 print '<td>' . $langs->trans("UpInvoiceEmailCollectorEnabled") . '</td>';
-print '<td>' . ajax_constantonoff('UPINVOICE_EMAILCOLLECTOR_ENABLED', array(), $conf->entity) . '</td>';
-print '<td>' . $langs->trans("UpInvoiceEmailCollectorEnabledHelp") . '</td>';
+if (isModEnabled('emailcollector')) {
+    print '<td>' . ajax_constantonoff('UPINVOICE_EMAILCOLLECTOR_ENABLED', array(), $conf->entity) . '</td>';
+    print '<td>' . $langs->trans("UpInvoiceEmailCollectorEnabledHelp") . '</td>';
+} else {
+    print '<td><span class="opacitymedium">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</span></td>';
+    // transnoentitiesnoconv on the inner label: trans() re-encodes '&' of nested
+    // entities, so a plain trans() here would render a literal "M&oacute;dulos"
+    print '<td><span class="warning">' . $langs->trans(
+        "UpInvoiceEmailCollectorModuleDisabled",
+        '<a href="' . DOL_URL_ROOT . '/admin/modules.php?search_keyword=emailcollector">' . $langs->transnoentitiesnoconv("Modules") . '</a>'
+    ) . '</span></td>';
+}
 print '</tr>';
 
-// Enable automatic AI processing by cron (only applies to source='email' files)
+// Enable automatic AI processing by cron (only applies to source='email' files,
+// so it is pointless without the email intake: gate it the same way)
+$intakeActive = isModEnabled('emailcollector') && getDolGlobalString('UPINVOICE_EMAILCOLLECTOR_ENABLED');
 print '<tr class="oddeven">';
 print '<td>' . $langs->trans("UpInvoiceAutoAiProcessing") . '</td>';
-print '<td>' . ajax_constantonoff('UPINVOICE_AUTO_AI_PROCESSING', array(), $conf->entity) . '</td>';
-print '<td>' . $langs->trans("UpInvoiceAutoAiProcessingHelp") . ' <a href="' . DOL_URL_ROOT . '/cron/list.php">' . $langs->trans("UpInvoiceSeeCronJobs") . '</a></td>';
+if ($intakeActive) {
+    print '<td>' . ajax_constantonoff('UPINVOICE_AUTO_AI_PROCESSING', array(), $conf->entity) . '</td>';
+    print '<td>' . $langs->trans("UpInvoiceAutoAiProcessingHelp") . ' <a href="' . DOL_URL_ROOT . '/cron/list.php">' . $langs->trans("UpInvoiceSeeCronJobs") . '</a></td>';
+} else {
+    print '<td><span class="opacitymedium">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</span></td>';
+    print '<td><span class="warning">' . $langs->trans("UpInvoiceAutoAiRequiresIntake") . '</span></td>';
+}
 print '</tr>';
 
 print '</table>';
@@ -274,7 +293,7 @@ if (getDolGlobalString('UPINVOICE_EMAILCOLLECTOR_ENABLED')) {
             print '</form>';
         }
     } else {
-        print info_admin($langs->trans("UpInvoiceEmailCollectorModuleDisabled", '<a href="' . DOL_URL_ROOT . '/admin/modules.php?search_keyword=emailcollector">' . $langs->trans("Modules") . '</a>'));
+        print info_admin($langs->trans("UpInvoiceEmailCollectorModuleDisabled", '<a href="' . DOL_URL_ROOT . '/admin/modules.php?search_keyword=emailcollector">' . $langs->transnoentitiesnoconv("Modules") . '</a>'));
     }
 }
 

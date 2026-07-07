@@ -310,6 +310,7 @@ UpInvoiceEmailCollectorEnabled=Enable email intake (EmailCollector)
 UpInvoiceEmailCollectorEnabledHelp=Adds an operation to the EmailCollector module to fetch PDF attachments from a mailbox and queue them in UpInvoice for AI processing
 UpInvoiceAutoAiProcessing=Automatic AI processing (email documents)
 UpInvoiceAutoAiProcessingHelp=A scheduled job automatically processes files queued via email. Manually uploaded files stay pending until you click "Process".
+UpInvoiceAutoAiRequiresIntake=Requires email intake: enable the EmailCollector module and the email intake option above. This job only processes files received by email.
 UpInvoiceSeeCronJobs=See scheduled jobs
 UpInvoiceEmailMinFileSize=Minimum attachment size (bytes)
 UpInvoiceEmailMinFileSizeHelp=Email attachments smaller than this size are ignored (filters signature images)

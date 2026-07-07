@@ -96,6 +96,13 @@ class UpInvoiceFiles extends CommonObject
     public $import_error;
 
     /**
+     * @var int Failed AI extraction attempts. The cron auto-retries transient API
+     *          failures while this stays below UPINVOICE_AI_MAX_RETRIES; a manual
+     *          "Retry" from the UI is always allowed regardless of the counter.
+     */
+    public $ai_retries = 0;
+
+    /**
      * @var string|null Origin of the file: null/'web' = manual upload; 'email' = queued via EmailCollector
      */
     public $source;
@@ -198,7 +205,7 @@ class UpInvoiceFiles extends CommonObject
     {
         $sql = "SELECT rowid, file_path, original_filename, file_size, file_type, api_json,";
         $sql .= " date_creation, fk_user_creat, date_modification, fk_user_modif,";
-        $sql .= " import_step, fk_supplier, fk_invoice, status, processing, import_error, source, file_hash, import_rule_label, calc_method";
+        $sql .= " import_step, fk_supplier, fk_invoice, status, processing, import_error, ai_retries, source, file_hash, import_rule_label, calc_method";
         $sql .= " FROM " . MAIN_DB_PREFIX . $this->table_element;
         $sql .= " WHERE rowid = " . (int) $id;
         
@@ -223,6 +230,7 @@ class UpInvoiceFiles extends CommonObject
                 $this->status = $obj->status;
                 $this->processing = $obj->processing;
                 $this->import_error = $obj->import_error;
+                $this->ai_retries = (int) $obj->ai_retries;
                 $this->source = isset($obj->source) ? $obj->source : null;
                 $this->file_hash = isset($obj->file_hash) ? $obj->file_hash : null;
                 $this->import_rule_label = isset($obj->import_rule_label) ? $obj->import_rule_label : null;
@@ -268,6 +276,7 @@ class UpInvoiceFiles extends CommonObject
         $sql .= " status = " . (int) $this->status . ",";
         $sql .= " processing = " . (int) $this->processing . ",";
         $sql .= " import_error = " . (isset($this->import_error) ? "'".$this->db->escape($this->import_error)."'" : "null") . ",";
+        $sql .= " ai_retries = " . (int) $this->ai_retries . ",";
         $sql .= " calc_method = " . (!empty($this->calc_method) ? (int) $this->calc_method : "null");
         $sql .= " WHERE rowid = " . (int) $this->id;
         
@@ -382,12 +391,18 @@ class UpInvoiceFiles extends CommonObject
 
         $maxfiles = max(1, (int) $maxfiles);
 
+        // Transient API failures ("success" without data) are common enough that the
+        // cron re-tries failed extractions a limited number of times on later passes.
+        $maxretries = getDolGlobalInt('UPINVOICE_AI_MAX_RETRIES', 2);
+
         // No entity filter: the cron handles the queue of every entity, switching context per row
         // Only auto-process files that arrived via email; manually uploaded files stay pending
         // until the user clicks "Process" from the web interface.
+        // Fresh files (status 0) go first; failed ones (status -1) are retried after them.
         $sql = "SELECT rowid, entity FROM ".MAIN_DB_PREFIX.$this->table_element;
-        $sql .= " WHERE processing = 0 AND status = 0 AND source = 'email'";
-        $sql .= " ORDER BY date_creation ASC";
+        $sql .= " WHERE processing = 0 AND source = 'email'";
+        $sql .= " AND (status = 0 OR (status = -1 AND ai_retries <= ".((int) $maxretries)."))";
+        $sql .= " ORDER BY status DESC, date_creation ASC";
         $sql .= " ".$this->db->plimit($maxfiles);
 
         $resql = $this->db->query($sql);
@@ -415,7 +430,7 @@ class UpInvoiceFiles extends CommonObject
         foreach ($rows as $row) {
             // Atomic claim so parallel cron runs never process the same file twice
             $sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET processing = 1";
-            $sql .= " WHERE rowid = ".((int) $row['rowid'])." AND processing = 0 AND status = 0";
+            $sql .= " WHERE rowid = ".((int) $row['rowid'])." AND processing = 0 AND status IN (0, -1)";
             $resql = $this->db->query($sql);
             if (!$resql || $this->db->affected_rows($resql) == 0) {
                 $nbskipped++;
@@ -612,6 +627,9 @@ class UpInvoiceFiles extends CommonObject
                     $this->update($user, 1);
                     return 1;
                 }
+                // Keep the raw response in the log: these "success without data" replies
+                // are transient API-side failures and are impossible to diagnose otherwise
+                dol_syslog("UpInvoiceFiles::processWithApi file id=".$this->id." API success without invoice data, raw response: ".dol_trunc($response, 2000, 'right', 'UTF-8', 1), LOG_WARNING);
                 throw new Exception($langs->trans('CouldNotExtractInvoiceData'));
             }
 
@@ -639,8 +657,11 @@ class UpInvoiceFiles extends CommonObject
             $this->status = -1; // Error
             $this->processing = 0; // No longer processing
             $this->import_error = $e->getMessage();
+            $this->ai_retries = (int) $this->ai_retries + 1; // Count the failed attempt (gates cron auto-retry)
             $this->update($user, 1);
-            
+
+            dol_syslog("UpInvoiceFiles::processWithApi file id=".$this->id." attempt ".$this->ai_retries." failed: ".$e->getMessage(), LOG_WARNING);
+
             return -1;
         }
     }
@@ -749,6 +770,21 @@ class UpInvoiceFiles extends CommonObject
     }
 
     /**
+     * Normalize a subject (or subject rule) for comparison. RFC 2047 Q-encoded
+     * subjects (any subject with accents) encode spaces as underscores, and both
+     * imap_utf8() and the PHPIMAP lib can leave them undecoded ("RV:_Factura_PO...").
+     * Comparing with underscores folded to spaces on BOTH sides makes the match
+     * immune to that artifact without breaking subjects that use real underscores.
+     *
+     * @param string $s Subject or rule fragment
+     * @return string
+     */
+    private static function normalizeSubjectForMatch($s)
+    {
+        return str_replace('_', ' ', (string) $s);
+    }
+
+    /**
      * Test whether a single attachment matches an auto-import rule.
      * All conditions are ANDed; empty conditions act as wildcards.
      *
@@ -762,7 +798,7 @@ class UpInvoiceFiles extends CommonObject
     public static function attachmentMatchesRule($rule, $from, $subject, $filename, $ext)
     {
         $senderOk  = (empty($rule->sender_contains)  || stripos((string) $from, $rule->sender_contains) !== false);
-        $subjectOk = (empty($rule->subject_contains) || stripos((string) $subject, $rule->subject_contains) !== false);
+        $subjectOk = (empty($rule->subject_contains) || stripos(self::normalizeSubjectForMatch($subject), self::normalizeSubjectForMatch($rule->subject_contains)) !== false);
         if (!$senderOk || !$subjectOk) {
             return false;
         }
@@ -810,7 +846,7 @@ class UpInvoiceFiles extends CommonObject
     public static function attachmentMatchesBlacklistRule($rule, $from, $subject, $filename, $ext)
     {
         $senderOk  = (empty($rule->sender_contains)  || stripos((string) $from, $rule->sender_contains) !== false);
-        $subjectOk = (empty($rule->subject_contains) || stripos((string) $subject, $rule->subject_contains) !== false);
+        $subjectOk = (empty($rule->subject_contains) || stripos(self::normalizeSubjectForMatch($subject), self::normalizeSubjectForMatch($rule->subject_contains)) !== false);
         if (!$senderOk || !$subjectOk) {
             return false;
         }

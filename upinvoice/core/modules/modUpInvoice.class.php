@@ -35,7 +35,7 @@ class modUpInvoice extends DolibarrModules
         $this->descriptionlong = "This module allows to upload, validate and register supplier invoices in a three steps process";
         $this->editor_name = "UpInvoice.eu";
         $this->editor_url = "https://upinvoice.eu";
-        $this->version = '1.3.0';
+        $this->version = '1.4.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';
 
@@ -125,11 +125,11 @@ class modUpInvoice extends DolibarrModules
                 'objectname' => 'UpInvoiceFiles',
                 'method' => 'processPendingAiBatch',
                 'parameters' => '5',
-                'comment' => 'Process pending UpInvoice files (queued manually or from email attachments) with the AI API',
+                'comment' => 'Process pending UpInvoice files received by email with the AI API (manually uploaded files are processed from the web interface)',
                 'frequency' => 5,
                 'unitfrequency' => 60,
                 'status' => 1,
-                'test' => 'isModEnabled("upinvoice") && getDolGlobalString("UPINVOICE_AUTO_AI_PROCESSING")'
+                'test' => 'isModEnabled("upinvoice") && isModEnabled("emailcollector") && getDolGlobalString("UPINVOICE_EMAILCOLLECTOR_ENABLED") && getDolGlobalString("UPINVOICE_AUTO_AI_PROCESSING")'
             )
         );
 

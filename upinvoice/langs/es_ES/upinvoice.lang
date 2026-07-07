@@ -310,6 +310,7 @@ UpInvoiceEmailCollectorEnabled=Activar entrada por email (EmailCollector)
 UpInvoiceEmailCollectorEnabledHelp=Añade una operación al módulo EmailCollector para descargar adjuntos PDF de un buzón y encolarlos en UpInvoice para su procesado con IA
 UpInvoiceAutoAiProcessing=Procesado automático con IA (documentos por email)
 UpInvoiceAutoAiProcessingHelp=Un trabajo programado procesa automáticamente solo los archivos obtenidos por email. Los archivos subidos manualmente quedan pendientes hasta que el usuario pulse "Procesar".
+UpInvoiceAutoAiRequiresIntake=Requiere la entrada por email: activa el módulo EmailCollector y la opción de entrada por email de arriba. Este trabajo solo procesa archivos recibidos por email.
 UpInvoiceSeeCronJobs=Ver trabajos programados
 UpInvoiceEmailMinFileSize=Tamaño mínimo del adjunto (bytes)
 UpInvoiceEmailMinFileSizeHelp=Los adjuntos de email menores de este tamaño se ignoran (filtra imágenes de firma)

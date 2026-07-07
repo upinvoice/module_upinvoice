@@ -1,3 +1,14 @@
+1.4.0 (2026-07-07)
+- Cron auto-retries transient AI failures ("success" with no data) up to UPINVOICE_AI_MAX_RETRIES times (default 2); new ai_retries column (migration llx_upinvoice_files-add-ai_retries.sql)
+- Raw API response logged via dol_syslog when extraction returns no data, and on every failed attempt
+- Fix: email rules with spaces in the subject never matched MIME Q-encoded subjects (underscores left undecoded); matching now folds _ to space on both sides
+- Pagination on the finished-files list (server-side, respects conf->liste_limit)
+- Setup UX: email intake toggle disabled with a call-to-action when the EmailCollector module is off; auto AI processing toggle requires intake enabled (the cron only processes email files)
+- Cron job eligibility test now also requires EmailCollector + intake enabled (applies on module re-activation); fixed misleading job comment
+- Fix: double-encoded HTML entities in the "Modules" link of setup warnings
+- Reconciliation warning: "extra" lines only add to the document total, not to the extracted base/VAT (no more false Base mismatch)
+- README: configuration section (API key) and email intake documentation
+
 1.3.0 (2026-06-19)
 - Pending files toolbar: search, status filter, sort, pause/resume queue, retry errors, refresh
 - Auto-polling every 20 s keeps the list up to date without manual reload

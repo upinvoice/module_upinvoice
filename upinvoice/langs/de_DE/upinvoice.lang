@@ -274,6 +274,7 @@ UpInvoiceEmailCollectorEnabled=E-Mail-Eingang aktivieren (EmailCollector)
 UpInvoiceEmailCollectorEnabledHelp=Fügt dem Modul EmailCollector eine Operation hinzu, die PDF-Anhänge aus einem Postfach abruft und in UpInvoice zur KI-Verarbeitung einreiht
 UpInvoiceAutoAiProcessing=Automatische KI-Verarbeitung (E-Mail-Dokumente)
 UpInvoiceAutoAiProcessingHelp=Ein geplanter Auftrag verarbeitet automatisch nur die per E-Mail empfangenen Dateien. Manuell hochgeladene Dateien bleiben ausstehend, bis der Benutzer "Verarbeiten" klickt.
+UpInvoiceAutoAiRequiresIntake=Erfordert den E-Mail-Eingang: aktivieren Sie das EmailCollector-Modul und die obige E-Mail-Eingangsoption. Dieser Auftrag verarbeitet nur per E-Mail empfangene Dateien.
 UpInvoiceSeeCronJobs=Geplante Aufträge anzeigen
 UpInvoiceEmailMinFileSize=Minimale Anhanggröße (Bytes)
 UpInvoiceEmailMinFileSizeHelp=E-Mail-Anhänge unterhalb dieser Größe werden ignoriert (filtert Signaturbilder)
