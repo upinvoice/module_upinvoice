@@ -42,6 +42,48 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/ajax.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formadmin.class.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formother.class.php';
 
+/**
+ * Translate a key whose %s placeholder must be filled with an HTML link,
+ * without letting Translate::trans() run htmlentities() over that link.
+ * trans() only "rescues" a hardcoded set of literal tags (<a , </a>, ...)
+ * from its own htmlentities() pass, and that rescue list is not consistent
+ * across Dolibarr core versions (works on 22.0.4, breaks on 20.0.3, where
+ * the link ends up htmlentities-encoded and printed as literal HTML text).
+ * Substituting the link after trans() has run sidesteps the issue entirely.
+ *
+ * @param string $key    Translation key with one %s placeholder
+ * @param string $linkhtml Raw <a>...</a> HTML to place at the placeholder
+ * @return string Translated string with the link inserted, safe to print
+ */
+function upinvoiceTransWithLink($key, $linkhtml)
+{
+    global $langs;
+
+    $placeholder = '__UPINVOICE_LINK__';
+    $text = $langs->trans($key, $placeholder);
+
+    return str_replace($placeholder, $linkhtml, $text);
+}
+
+/**
+ * Print an info_admin()-style box but without info_admin()'s internal HTML
+ * escaping, whose allowed-tags allowlist (needed to keep a '<a>' link intact)
+ * is not consistent across Dolibarr core versions (breaks on 20.0.3, works on
+ * 22.0.4). $text must already be a trusted string (static translation plus
+ * links we built ourselves), never raw user input.
+ *
+ * @param string $text Already-safe HTML text to display
+ * @return void
+ */
+function upinvoicePrintInfoHtml($text)
+{
+    global $langs;
+
+    print '<div class="wordbreak info hideonsmartphone"><span class="fa fa-info-circle" title="'.dol_escape_htmltag($langs->trans('InfoAdmin')).'"></span> ';
+    print $text;
+    print '</div>';
+}
+
 // Load translation files
 $langs->loadLangs(array("admin", "upinvoice@upinvoice"));
 
@@ -238,7 +280,7 @@ if (isModEnabled('emailcollector')) {
     print '<td><span class="opacitymedium">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</span></td>';
     // transnoentitiesnoconv on the inner label: trans() re-encodes '&' of nested
     // entities, so a plain trans() here would render a literal "M&oacute;dulos"
-    print '<td><span class="warning">' . $langs->trans(
+    print '<td><span class="warning">' . upinvoiceTransWithLink(
         "UpInvoiceEmailCollectorModuleDisabled",
         '<a href="' . DOL_URL_ROOT . '/admin/modules.php?search_keyword=emailcollector">' . $langs->transnoentitiesnoconv("Modules") . '</a>'
     ) . '</span></td>';
@@ -281,7 +323,7 @@ if (getDolGlobalString('UPINVOICE_EMAILCOLLECTOR_ENABLED')) {
         }
 
         if ($collectorid > 0) {
-            print info_admin($langs->trans("UpInvoiceCollectorConfigured", '<a href="' . DOL_URL_ROOT . '/admin/emailcollector_card.php?id=' . ((int) $collectorid) . '">' . dol_escape_htmltag($collectorref) . '</a>'));
+            upinvoicePrintInfoHtml(upinvoiceTransWithLink("UpInvoiceCollectorConfigured", '<a href="' . DOL_URL_ROOT . '/admin/emailcollector_card.php?id=' . ((int) $collectorid) . '">' . dol_escape_htmltag($collectorref) . '</a>'));
         } else {
             print info_admin($langs->trans("UpInvoiceNoCollectorYet"));
             print '<form method="POST" action="' . $_SERVER["PHP_SELF"] . '">';
@@ -293,7 +335,7 @@ if (getDolGlobalString('UPINVOICE_EMAILCOLLECTOR_ENABLED')) {
             print '</form>';
         }
     } else {
-        print info_admin($langs->trans("UpInvoiceEmailCollectorModuleDisabled", '<a href="' . DOL_URL_ROOT . '/admin/modules.php?search_keyword=emailcollector">' . $langs->transnoentitiesnoconv("Modules") . '</a>'));
+        upinvoicePrintInfoHtml(upinvoiceTransWithLink("UpInvoiceEmailCollectorModuleDisabled", '<a href="' . DOL_URL_ROOT . '/admin/modules.php?search_keyword=emailcollector">' . $langs->transnoentitiesnoconv("Modules") . '</a>'));
     }
 }
 
