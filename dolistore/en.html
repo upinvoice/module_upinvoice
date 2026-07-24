@@ -1,0 +1,45 @@
+<p><strong>Module version:</strong> 1.3<br />
+<strong>Developer/License:</strong> David Motilla / GPL-v3<br />
+<strong>Available languages:</strong> Spanish, English, French, German, Italian<br />
+<strong>Support:</strong> Email to <a href="mailto:info@upinvoice.eu">info@upinvoice.eu</a><br />
+<br />
+<strong>Main features:</strong></p>
+
+<ul>
+	<li>Intuitive and streamlined three-step process</li>
+	<li>Multiple file upload with duplicate detection</li>
+	<li>Automatic data extraction via UpInvoice API</li>
+	<li>Advanced supplier search and creation system</li>
+	<li>Invoice data validation with automatic calculations</li>
+	<li>Supplier invoice creation with or without validation</li>
+	<li>Modern interface adapted to Dolibarr</li>
+</ul>
+
+<p><strong>New &ndash; Automatic email intake:</strong></p>
+
+<p>The module can now collect incoming invoices directly from an email mailbox, with no manual upload needed. Thanks to the integration with Dolibarr&rsquo;s <strong>EmailCollector</strong> module, attachments (PDF or images) arriving in your mailbox are automatically imported into the pending files list. From the setup page you can create a preconfigured collector with a single click, and enable <strong>automatic AI processing</strong> so a scheduled cron job extracts the data from incoming invoices without any manual action.</p>
+
+<p>In addition, <strong>import rules</strong> (by sender, subject or filename pattern) and a <strong>blacklist</strong> to exclude unwanted senders let you make sure only the messages and attachments that are actually invoices get imported. A live mailbox tab lets you browse received emails and import attachments manually whenever you prefer.</p>
+
+<p><strong>Requirements:</strong></p>
+
+<ul>
+	<li><strong>Minimum Dolibarr version:</strong> 14.0.0</li>
+	<li><strong>Maximum Dolibarr version:</strong> 23</li>
+	<li><strong>UpInvoice API key</strong> (available at <a href="https://upinvoice.eu" target="_blank">https://upinvoice.eu</a>)</li>
+	<li><strong>Supplier and Supplier Invoices modules</strong> must be enabled</li>
+</ul>
+
+<p><strong>Setup:</strong></p>
+
+<ol>
+	<li>Install the module from Dolistore or upload it manually</li>
+	<li>Go to <strong>Setup &gt; Modules</strong> and activate the UpInvoice module</li>
+	<li>In the module configuration, enter your UpInvoice API URL and API key</li>
+	<li>You&rsquo;re ready to go! Access it from the main menu</li>
+</ol>
+
+<p>This module integrates seamlessly with Dolibarr&rsquo;s workflow, allowing automatic attachment of original documents to the created invoices. For optimal performance, it is recommended to have the <strong>Electronic Document Management (GED)</strong> module activated.</p>
+
+<p>Warning: A subscription to the UpInvoice.eu service is required to connect its API with this module. Please check the pricing page at <a href="https://upinvoice.eu/prices">https://upinvoice.eu/prices</a> to choose the subscription that fits your needs.&nbsp;&nbsp;<br />
+Note: You can process a limited number of invoices for free to test the service and experience the time savings it provides.</p>

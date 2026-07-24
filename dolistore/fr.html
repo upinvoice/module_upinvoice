@@ -1,0 +1,45 @@
+<p><strong>Version du module :</strong> 1.3<br />
+<strong>D&eacute;veloppeur/Licence :</strong> David Motilla / GPL-v3<br />
+<strong>Langues disponibles :</strong> Espagnol, Anglais, Fran&ccedil;ais, Allemand, Italien<br />
+<strong>Support :</strong> Email &agrave; <a href="mailto:info@upinvoice.eu">info@upinvoice.eu</a><br />
+<br />
+<strong>Fonctionnalit&eacute;s principales :</strong></p>
+
+<ul>
+	<li>Processus en trois &eacute;tapes intuitif et fluide</li>
+	<li>T&eacute;l&eacute;versement de fichiers multiples avec d&eacute;tection des doublons</li>
+	<li>Extraction automatique des donn&eacute;es via l&rsquo;API UpInvoice</li>
+	<li>Syst&egrave;me avanc&eacute; de recherche et de cr&eacute;ation de fournisseurs</li>
+	<li>Validation des donn&eacute;es des factures avec calculs automatiques</li>
+	<li>Cr&eacute;ation des factures fournisseurs avec ou sans validation</li>
+	<li>Interface moderne et adapt&eacute;e &agrave; Dolibarr</li>
+</ul>
+
+<p><strong>Nouveaut&eacute; &ndash; Collecte automatique depuis la messagerie :</strong></p>
+
+<p>Le module peut d&eacute;sormais collecter les factures re&ccedil;ues directement depuis une bo&icirc;te mail, sans t&eacute;l&eacute;versement manuel. Gr&acirc;ce &agrave; l&rsquo;int&eacute;gration avec le module <strong>EmailCollector</strong> de Dolibarr, les pi&egrave;ces jointes (PDF ou images) arrivant dans votre bo&icirc;te sont import&eacute;es automatiquement dans la liste des fichiers en attente. Depuis la page de configuration, vous pouvez cr&eacute;er un collecteur pr&eacute;configur&eacute; en un seul clic et activer le <strong>traitement automatique par IA</strong> afin qu&rsquo;une t&acirc;che planifi&eacute;e (cron) extraie les donn&eacute;es des factures entrantes sans aucune intervention manuelle.</p>
+
+<p>De plus, des <strong>r&egrave;gles d&rsquo;import</strong> (par exp&eacute;diteur, sujet ou motif de nom de fichier) et une <strong>liste noire</strong> pour exclure les exp&eacute;diteurs ind&eacute;sirables vous permettent de n&rsquo;importer que les messages et pi&egrave;ces jointes qui sont r&eacute;ellement des factures. Un onglet de bo&icirc;te mail en direct vous permet de consulter les emails re&ccedil;us et d&rsquo;importer des pi&egrave;ces jointes manuellement quand vous le souhaitez.</p>
+
+<p><strong>Pr&eacute;-requis :</strong></p>
+
+<ul>
+	<li><strong>Version minimale de Dolibarr :</strong> 14.0.0</li>
+	<li><strong>Version maximale de Dolibarr :</strong> 23</li>
+	<li><strong>Cl&eacute; API UpInvoice</strong> (disponible sur <a href="https://upinvoice.eu" target="_blank">https://upinvoice.eu</a>)</li>
+	<li><strong>Modules Fournisseurs et Factures Fournisseurs</strong> activ&eacute;s</li>
+</ul>
+
+<p><strong>Configuration :</strong></p>
+
+<ol>
+	<li>Installer le module via Dolistore ou manuellement</li>
+	<li>Aller dans <strong>Configuration &gt; Modules</strong> et activer le module UpInvoice</li>
+	<li>Dans la configuration du module, entrer l&rsquo;URL de l&rsquo;API et la cl&eacute; API d&rsquo;UpInvoice</li>
+	<li>Pr&ecirc;t &agrave; l&rsquo;emploi ! Acc&egrave;s depuis le menu principal</li>
+</ol>
+
+<p>Le module s&rsquo;int&egrave;gre parfaitement dans le flux de travail de Dolibarr, en joignant automatiquement les documents originaux aux factures cr&eacute;&eacute;es. Pour un fonctionnement optimal, il est recommand&eacute; d&rsquo;activer le <strong>module de Gestion &Eacute;lectronique de Documents (GED)</strong>.</p>
+
+<p>Avertissement : Un abonnement au service UpInvoice.eu est requis pour connecter son API avec ce module. Veuillez consulter la page des tarifs sur <a href="https://upinvoice.eu/prices">https://upinvoice.eu/prices</a> afin de choisir l&rsquo;abonnement adapt&eacute; &agrave; vos besoins.&nbsp;&nbsp;<br />
+Remarque : Vous pouvez traiter gratuitement un nombre limit&eacute; de factures pour tester le service et constater le gain de temps qu&rsquo;il vous apporte.</p>

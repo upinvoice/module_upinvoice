@@ -281,7 +281,7 @@ $morejs = array(
     '/upinvoice/js/upinvoice-product-selector.js', // Add the new product selector JS
 );
 $morecss = array(
-    '/upinvoice/css/upinvoiceimport.css'
+    '/upinvoice/css/upinvoiceimport.css.php'
 );
 
 // Page header — hide the left menu to give the document viewer + form full width

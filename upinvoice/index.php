@@ -57,7 +57,7 @@ $morejs = array(
     '/upinvoice/js/upinvoiceimport.js'
 );
 $morecss = array(
-    '/upinvoice/css/upinvoiceimport.css'
+    '/upinvoice/css/upinvoiceimport.css.php'
 );
 
 // Page header

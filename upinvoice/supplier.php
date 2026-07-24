@@ -245,7 +245,7 @@ $morejs = array(
     '/upinvoice/js/upinvoiceimport.js', 
     '/upinvoice/js/supplier-search.js'
 );
-$morecss = array('/upinvoice/css/upinvoiceimport.css');
+$morecss = array('/upinvoice/css/upinvoiceimport.css.php');
 
 // Page header — hide the left menu for a cleaner validation screen
 $conf->dol_hide_leftmenu = 1;

@@ -1,0 +1,45 @@
+<p><strong>Versione del modulo:</strong> 1.3<br />
+<strong>Sviluppatore/Licenza:</strong> David Motilla / GPL-v3<br />
+<strong>Lingue disponibili:</strong> Spagnolo, Inglese, Francese, Tedesco, Italiano<br />
+<strong>Supporto:</strong> Email a <a href="mailto:info@upinvoice.eu">info@upinvoice.eu</a><br />
+<br />
+<strong>Funzionalit&agrave; principali:</strong></p>
+
+<ul>
+	<li>Processo in tre fasi intuitivo e fluido</li>
+	<li>Caricamento multiplo di file con rilevamento duplicati</li>
+	<li>Estrazione automatica dei dati tramite API UpInvoice</li>
+	<li>Sistema avanzato per la ricerca e creazione dei fornitori</li>
+	<li>Validazione dei dati delle fatture con calcoli automatici</li>
+	<li>Creazione delle fatture fornitori con o senza validazione</li>
+	<li>Interfaccia moderna e adattata a Dolibarr</li>
+</ul>
+
+<p><strong>Novit&agrave; &ndash; Raccolta automatica dalla casella email:</strong></p>
+
+<p>Il modulo pu&ograve; ora raccogliere le fatture ricevute direttamente da una casella di posta, senza caricamento manuale. Grazie all&rsquo;integrazione con il modulo <strong>EmailCollector</strong> di Dolibarr, gli allegati (PDF o immagini) in arrivo nella casella vengono importati automaticamente nell&rsquo;elenco dei file in attesa. Dalla pagina di configurazione &egrave; possibile creare un collector preconfigurato con un solo clic e attivare l&rsquo;<strong>elaborazione automatica con IA</strong>, in modo che un&rsquo;attivit&agrave; pianificata (cron) estragga i dati delle fatture in arrivo senza alcun intervento manuale.</p>
+
+<p>Inoltre, le <strong>regole di importazione</strong> (per mittente, oggetto o modello di nome file) e una <strong>lista nera</strong> per escludere i mittenti indesiderati garantiscono che vengano importati solo i messaggi e gli allegati che sono realmente fatture. Una scheda con la casella di posta in tempo reale consente di consultare le email ricevute e importare gli allegati manualmente quando si preferisce.</p>
+
+<p><strong>Requisiti:</strong></p>
+
+<ul>
+	<li><strong>Versione minima di Dolibarr:</strong> 14.0.0</li>
+	<li><strong>Versione massima di Dolibarr:</strong> 23</li>
+	<li><strong>Chiave API di UpInvoice</strong> (disponibile su <a href="https://upinvoice.eu" target="_blank">https://upinvoice.eu</a>)</li>
+	<li><strong>Moduli Fornitori e Fatture Fornitori</strong> attivati</li>
+</ul>
+
+<p><strong>Configurazione:</strong></p>
+
+<ol>
+	<li>Installa il modulo da Dolistore o manualmente</li>
+	<li>Vai su <strong>Configurazione &gt; Moduli</strong> e attiva il modulo UpInvoice</li>
+	<li>Inserisci l&rsquo;URL dell&rsquo;API e la chiave API di UpInvoice nella configurazione del modulo</li>
+	<li>Pronto all&rsquo;uso! Accesso dal menu principale</li>
+</ol>
+
+<p>Il modulo si integra perfettamente nel flusso di lavoro di Dolibarr, allegando automaticamente i documenti originali alle fatture create. Per un funzionamento ottimale, si consiglia di attivare il <strong>modulo di Gestione Elettronica dei Documenti (GED)</strong>.</p>
+
+<p>Avvertenza: &Egrave; necessario un abbonamento al servizio UpInvoice.eu per collegare la sua API a questo modulo. Consultare la pagina dei prezzi su <a href="https://upinvoice.eu/prices" target="_blank">https://upinvoice.eu/prices</a> per scegliere l&rsquo;abbonamento pi&ugrave; adatto alle proprie esigenze.<br />
+Nota: &Egrave; possibile elaborare gratuitamente un numero limitato di fatture per provare il servizio e scoprire il risparmio di tempo che offre.</p>
