@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS llx_upinvoice_files (
   status TINYINT DEFAULT 0, -- 0:pending, 1:processed, -1:error
   processing TINYINT DEFAULT 0, -- 0:not processing, 1:processing
   import_error TEXT,
+  ai_retries SMALLINT NOT NULL DEFAULT 0, -- failed AI extraction attempts (gates cron auto-retry)
   source VARCHAR(32) DEFAULT NULL, -- NULL or 'web': manual upload; 'email': queued via EmailCollector
   import_rule_label VARCHAR(255) DEFAULT NULL, -- snapshot of the auto-import rule that queued an email file
   file_hash VARCHAR(64) DEFAULT NULL, -- SHA-256 hex digest for content-based deduplication

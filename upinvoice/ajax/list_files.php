@@ -142,8 +142,13 @@ if (!$resql) {
 $files = array();
 while ($obj = $db->fetch_object($resql)) {
     $file = new UpInvoiceFiles($db);
-    $file->fetch($obj->rowid);
-    $files[] = $file;
+    if ($file->fetch($obj->rowid) > 0) {
+        $files[] = $file;
+    } else {
+        // A failed fetch (e.g. schema mismatch right after a module update) would
+        // render an empty card whose actions all fail with InvalidRequest.
+        dol_syslog("upinvoice list_files: fetch failed for rowid ".$obj->rowid.": ".$file->error, LOG_ERR);
+    }
 }
 
 // Generate HTML
