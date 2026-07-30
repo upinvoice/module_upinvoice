@@ -67,7 +67,8 @@ if (!isset($_POST['token']) || !isset($_POST['filename']) || !isset($_POST['file
 
 // Get POST parameters
 $token = GETPOST('token', 'alpha');
-$filename = GETPOST('filename', 'alpha');
+// Same normalization as ajax/upload.php, so the comparison matches what is stored
+$filename = UpInvoiceFiles::normalizeFilename(GETPOST('filename', 'alpha'));
 $filesize = GETPOST('filesize', 'int');
 
 // Check for duplicate file

@@ -94,7 +94,11 @@ if (isset($_FILES['userfile']) && is_array($_FILES['userfile']['name'])) {
     
     // Loop through each file
     for ($i = 0; $i < $nbFiles; $i++) {
-        $originalFileName = $_FILES['userfile']['name'][$i];
+        // Raw name as sent by the browser: used in the JSON response so the JS
+        // can match each result with its preview. The normalized version (NFC +
+        // latin1-safe) is what gets stored in database.
+        $rawFileName = $_FILES['userfile']['name'][$i];
+        $originalFileName = UpInvoiceFiles::normalizeFilename($rawFileName);
         $fileSize = $_FILES['userfile']['size'][$i];
         $fileType = $_FILES['userfile']['type'][$i];
         $tmpName = $_FILES['userfile']['tmp_name'][$i];
@@ -104,7 +108,7 @@ if (isset($_FILES['userfile']) && is_array($_FILES['userfile']['name'])) {
         if ($error != UPLOAD_ERR_OK) {
             $errorMessage = getUploadErrorMessage($error);
             $result['files'][] = array(
-                'name' => $originalFileName,
+                'name' => $rawFileName,
                 'status' => 'error',
                 'message' => $errorMessage
             );
@@ -115,25 +119,16 @@ if (isset($_FILES['userfile']) && is_array($_FILES['userfile']['name'])) {
         $allowedTypes = array('application/pdf', 'image/jpeg', 'image/png', 'image/gif');
         if (!in_array($fileType, $allowedTypes)) {
             $result['files'][] = array(
-                'name' => $originalFileName,
+                'name' => $rawFileName,
                 'status' => 'error',
                 'message' => $langs->trans('InvalidFileType')
             );
             continue;
         }
         
-        // Sanitize filename properly for storage
-        // We'll keep the original filename in the database but sanitize it for actual storage
-        $sanitizedFileName = dol_sanitizeFileName($originalFileName);
-        
-        // Generate a unique filename for storage (irrespective of original characters)
-        $uniqueFilename = pathinfo($sanitizedFileName, PATHINFO_FILENAME); // Get filename without extension
-        $uniqueFilename = trim($uniqueFilename); // Remove spaces at beginning and end
-        
-        if (empty($uniqueFilename)) {
-            $uniqueFilename = 'file'; // Fallback if filename is empty after sanitization
-        }
-        
+        // Generate a unique ASCII-only filename for storage, so file_path is
+        // always storable in database whatever the original name contains
+        $uniqueFilename = UpInvoiceFiles::asciiBaseName($originalFileName);
         $uniqueFilename .= '_' . dol_print_date(dol_now(), 'dayhourlog') . '_' . substr(md5(uniqid()), 0, 8);
         
         // Add appropriate extension based on file type
@@ -169,7 +164,7 @@ if (isset($_FILES['userfile']) && is_array($_FILES['userfile']['name'])) {
             
             if ($fileId > 0) {
                 $result['files'][] = array(
-                    'name' => $originalFileName,
+                    'name' => $rawFileName,
                     'status' => 'success',
                     'file_id' => $fileId,
                     'message' => $langs->trans('FileUploaded')
@@ -178,7 +173,7 @@ if (isset($_FILES['userfile']) && is_array($_FILES['userfile']['name'])) {
                 // Database error, remove the uploaded file
                 @unlink($dest_file);
                 $result['files'][] = array(
-                    'name' => $originalFileName,
+                    'name' => $rawFileName,
                     'status' => 'error',
                     'message' => $langs->trans('DatabaseError')
                 );
@@ -186,7 +181,7 @@ if (isset($_FILES['userfile']) && is_array($_FILES['userfile']['name'])) {
         } else {
             // Upload error
             $result['files'][] = array(
-                'name' => $originalFileName,
+                'name' => $rawFileName,
                 'status' => 'error',
                 'message' => $langs->trans('UploadError')
             );

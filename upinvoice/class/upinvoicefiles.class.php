@@ -136,6 +136,77 @@ class UpInvoiceFiles extends CommonObject
     {
         $this->db = $db;
     }
+
+    /**
+     * Normalize a user-supplied filename so it can be stored in the latin1
+     * columns of llx_upinvoice_files and compared consistently for dedup.
+     *
+     * macOS drag&drop sends names in NFD ("n" + combining tilde) that MySQL
+     * rejects with "Incorrect string value"; NFC composition fixes that.
+     * Characters with no latin1 equivalent are transliterated or dropped.
+     *
+     * @param string $filename Raw filename (as sent by browser or mail header)
+     * @return string Normalized UTF-8 filename, never empty
+     */
+    public static function normalizeFilename($filename)
+    {
+        $filename = (string) $filename;
+
+        if (function_exists('mb_check_encoding') && !mb_check_encoding($filename, 'UTF-8')) {
+            $filename = mb_convert_encoding($filename, 'UTF-8', 'UTF-8');
+        }
+
+        if (class_exists('Normalizer')) {
+            $nfc = Normalizer::normalize($filename, Normalizer::FORM_C);
+            if ($nfc !== false) {
+                $filename = $nfc;
+            }
+        }
+
+        if (function_exists('iconv')) {
+            $latin1 = @iconv('UTF-8', 'ISO-8859-1//TRANSLIT//IGNORE', $filename);
+            if ($latin1 !== false && $latin1 !== '') {
+                $utf8 = @iconv('ISO-8859-1', 'UTF-8', $latin1);
+                if ($utf8 !== false) {
+                    $filename = $utf8;
+                }
+            }
+        }
+
+        $filename = trim($filename);
+        if ($filename === '' || trim(pathinfo($filename, PATHINFO_FILENAME)) === '') {
+            $filename = 'file'.$filename;
+        }
+
+        return $filename;
+    }
+
+    /**
+     * ASCII-only base name (no extension) used to build the on-disk filename,
+     * so file_path is always storable and portable regardless of the original name.
+     *
+     * @param string $filename Filename (ideally already passed through normalizeFilename)
+     * @return string ASCII base name, never empty
+     */
+    public static function asciiBaseName($filename)
+    {
+        $base = trim(pathinfo(dol_sanitizeFileName($filename), PATHINFO_FILENAME));
+
+        if (function_exists('iconv')) {
+            $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $base);
+            if ($ascii !== false) {
+                $base = $ascii;
+            }
+        }
+
+        $base = preg_replace('/[^A-Za-z0-9._-]+/', '_', $base);
+        $base = trim($base, '._ ');
+        if ($base === '') {
+            $base = 'file';
+        }
+
+        return $base;
+    }
     
     /**
      * Create record in database
@@ -1039,6 +1110,8 @@ class UpInvoiceFiles extends CommonObject
     {
         global $conf;
 
+        $filename = self::normalizeFilename($filename);
+
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
         if (empty($ext) || !array_key_exists($ext, $allowedext)) {
             $reason = 'ext_not_allowed:'.$ext;
@@ -1062,10 +1135,7 @@ class UpInvoiceFiles extends CommonObject
         $upload_dir = DOL_DATA_ROOT.'/upinvoice/temp';
         dol_mkdir($upload_dir);
 
-        $baseName = trim(pathinfo(dol_sanitizeFileName($filename), PATHINFO_FILENAME));
-        if (empty($baseName)) {
-            $baseName = 'file';
-        }
+        $baseName = self::asciiBaseName($filename);
         $storedExt = ($ext === 'jpeg') ? 'jpg' : $ext;
         $uniqueFilename = $baseName.'_'.dol_print_date(dol_now(), 'dayhourlog').'_'.substr(md5(uniqid()), 0, 8).'.'.$storedExt;
         $dest_file = $upload_dir.'/'.$uniqueFilename;
