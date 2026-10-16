@@ -384,6 +384,7 @@ print '</div>'; // Close container
         'UpInvoiceCreditsRemaining': '<?php echo html_entity_decode($langs->trans("UpInvoiceCreditsRemaining")); ?>',
         'UpInvoiceCreditsOf': '<?php echo html_entity_decode($langs->trans("UpInvoiceCreditsOf")); ?>',
         'UpInvoiceNoCredits': '<?php echo html_entity_decode($langs->trans("UpInvoiceNoCredits")); ?>',
+        'UpInvoiceAddCredits': '<?php echo dol_escape_js(html_entity_decode($langs->trans("UpInvoiceAddCredits"))); ?>',
         'UpInvoiceLoadingAccount': '<?php echo html_entity_decode($langs->trans("UpInvoiceLoadingAccount")); ?>',
         'EmailListCachedHint': '<?php echo html_entity_decode($langs->trans("EmailListCachedHint")); ?>',
         'EmailUpdatedJustNow': '<?php echo html_entity_decode($langs->trans("EmailUpdatedJustNow")); ?>',

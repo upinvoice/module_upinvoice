@@ -29,6 +29,17 @@ var _editingRuleId = null;
 var _upinvoiceCreditsDebounceTimer = null;
 
 /**
+ * "Add credits" button for the credits bar, or '' when the API sent no link.
+ */
+function upinvoiceAddCreditsLink(links) {
+    var url = links && links.add_credits;
+    if (!url || !/^https?:\/\//.test(url) || !upinvoiceimport_langs.UpInvoiceAddCredits) return '';
+    return ' &nbsp; <a href="' + $('<div>').text(url).html() + '" target="_blank" rel="noopener" class="button small"'
+        + ' style="padding:2px 10px;font-size:0.9em;vertical-align:middle">'
+        + $('<div>').text(upinvoiceimport_langs.UpInvoiceAddCredits).html() + '</a>';
+}
+
+/**
  * Load (or refresh) the credits bar from the API.
  * Pass force=true to bypass the PHP session cache (used on manual refresh).
  */
@@ -67,15 +78,24 @@ function upinvoiceLoadCreditsBar(force) {
                 if (resp.data.plan && resp.data.plan.name) {
                     creditsHtml += ' &nbsp; <span style="color:#666;font-size:0.9em">' + resp.data.plan.name + '</span>';
                 }
+                // Older APIs don't send credits.low: fall back to the 20% bar
+                var isLow = (typeof c.low === 'boolean') ? c.low : barPct < 20;
                 if (remaining === 0 && upinvoiceimport_langs.UpInvoiceNoCredits) {
                     creditsHtml += ' &nbsp; <span style="color:#e05353;font-weight:bold">' + upinvoiceimport_langs.UpInvoiceNoCredits + '</span>';
                     $bar.css('background', '#fff3f3');
-                } else if (barPct < 20) {
+                } else if (isLow) {
                     $bar.css('background', '#fff8e1');
                 } else {
                     $bar.css('background', '#f8f8f8');
                 }
+                if ((isLow || remaining === 0) && resp.data.links) {
+                    creditsHtml += upinvoiceAddCreditsLink(resp.data.links);
+                }
                 $content.html(creditsHtml);
+            } else if (resp && resp.code === 'no_plan' && resp.links) {
+                $bar.css('background', '#fff3f3');
+                $content.html('<span style="color:#e05353;font-weight:bold">' + (upinvoiceimport_langs.UpInvoiceNoCredits || '') + '</span>'
+                    + upinvoiceAddCreditsLink(resp.links));
             } else {
                 $content.html('<span style="color:#999;font-size:0.9em">–</span>');
             }

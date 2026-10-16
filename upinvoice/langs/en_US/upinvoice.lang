@@ -327,6 +327,7 @@ UpInvoicePlanExpired=Expired
 UpInvoiceCreditsRemaining=Credits remaining
 UpInvoiceCreditsOf=credits
 UpInvoiceNoCredits=No credits available
+UpInvoiceAddCredits=Add credits
 UpInvoiceLoadingAccount=Loading account data...
 UpInvoicePlanExpires=Expires
 UpInvoiceErrInvalidKey=Invalid or expired API key

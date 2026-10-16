@@ -114,7 +114,11 @@ if ($httpCode === 200) {
 } elseif ($httpCode === 401) {
     $result = array('status' => 'error', 'code' => 'invalid_key');
 } elseif ($httpCode === 403) {
+    $json = json_decode($response, true);
     $result = array('status' => 'error', 'code' => 'no_plan');
+    if (!empty($json['links']) && is_array($json['links'])) {
+        $result['links'] = $json['links'];
+    }
 } elseif ($httpCode === 429) {
     $result = array('status' => 'error', 'code' => 'rate_limit');
 } else {

@@ -291,6 +291,7 @@ UpInvoicePlanExpired=Abgelaufen
 UpInvoiceCreditsRemaining=Verfügbare Credits
 UpInvoiceCreditsOf=Credits
 UpInvoiceNoCredits=Keine Credits verfügbar
+UpInvoiceAddCredits=Credits hinzufügen
 UpInvoiceLoadingAccount=Kontodaten werden geladen...
 UpInvoicePlanExpires=Läuft ab
 UpInvoiceErrInvalidKey=Ungültiger oder abgelaufener API-Schlüssel
