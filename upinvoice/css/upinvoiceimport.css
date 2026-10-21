@@ -2466,10 +2466,72 @@ tr.upinvoice-email-processed .upinvoice-attach-chip {
     display: inline-block;
     width: calc(100% - 102px);
     vertical-align: top;
+    /* Content (long nowrap product text) must not set the column min-width, or the table overflows */
+    contain: inline-size;
 }
-.upinv-split-right .product-match-info {
-    display: block;
-    clear: both;
+.upinv-split-right #invoice_lines_table textarea {
+    box-sizing: border-box;
+    width: 100% !important;
+}
+
+/* Selected product shown as a badge inside the Select2 box; Select2's own clear "×"
+   (prepended by allowClear) is moved to the end and styled as the badge's red close button.
+   Selectors carry .select2-container to beat select2.css (display:block + float on the clear). */
+.product-select-container .select2-container .select2-selection--single {
+    height: auto;
+    min-height: 28px;
+}
+.product-select-container .select2-container .select2-selection--single .select2-selection__rendered {
+    display: flex;
+    align-items: center;
+    min-height: 26px;
+    padding-left: 3px;
+    line-height: normal;
+}
+.product-select-container .select2-container .upinv-prod-badge {
+    order: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex: 0 1 auto;
+    min-width: 0;
+    height: 22px;
+    padding: 0 4px 0 7px;
+    background: #e7edf6;
+    color: #263c5c;
+    border-radius: 3px 0 0 3px;
+    font-size: 0.9em;
+}
+.product-select-container .select2-container .upinv-prod-badge i {
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+.product-select-container .select2-container .upinv-prod-badge-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.product-select-container .select2-container .select2-selection--single .select2-selection__clear {
+    order: 2;
+    float: none;
+    position: static;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    margin: 0;
+    padding: 0 7px 0 3px;
+    background: #e7edf6;
+    color: #dc3545;
+    font-size: 1.2em;
+    font-weight: bold;
+    border-radius: 0 3px 3px 0;
+    cursor: pointer;
+}
+.product-select-container .select2-container .select2-selection--single .select2-selection__clear:hover {
+    color: #fff;
+    background: #dc3545;
 }
 
 /* Product search (Select2) styled like the other fields */
@@ -2742,4 +2804,111 @@ a.upinv-btn-blue {
     .upinv-create-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Invoice lines on a narrow right column (small laptops, narrow window): each line becomes a grid.
+   Description keeps the left side across both rows; the numeric inputs wrap in two rows
+   (qty, unit price, discount, base / VAT %, VAT, total) so the product search gets room.
+   The header row uses the same grid so every label sits above its input. */
+.upinv-split-right {
+    container-type: inline-size;
+}
+/* With inline-size containment the column no longer sizes from its content: once stacked
+   (.upinv-split is align-items:flex-start) it would collapse to 0, so stretch it. */
+@media (max-width: 1100px) {
+    .upinv-split-right {
+        width: 100%;
+    }
+}
+@container (max-width: 860px) {
+    .upinv-split-right #invoice_lines_table,
+    .upinv-split-right #invoice_lines_table > tbody {
+        display: block;
+        width: 100%;
+    }
+    .upinv-split-right #invoice_lines_table tr.liste_titre,
+    .upinv-split-right #invoice_lines_table tr.invoice-line {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) repeat(4, 74px) 22px;
+        column-gap: 4px;
+        align-items: center;
+    }
+    .upinv-split-right #invoice_lines_table tr.invoice-line {
+        row-gap: 4px;
+        padding: 6px 0;
+        border-bottom: 1px solid #e3e6ea;
+    }
+    .upinv-split-right #invoice_lines_table tr.liste_titre > th,
+    .upinv-split-right #invoice_lines_table tr.invoice-line > td {
+        display: block;
+        min-width: 0;
+        border: 0;
+    }
+    /* Theme heights (tr.liste_titre 26px, td 32px) act as minimums in a table but are fixed
+       sizes in grid/block: the 2nd header row got hidden under the first line and the
+       description cell overflowed out of place. */
+    .upinv-split-right #invoice_lines_table tr.liste_titre {
+        height: auto !important; /* theme sets 26px !important */
+    }
+    .upinv-split-right #invoice_lines_table tr.invoice-line,
+    .upinv-split-right #invoice_lines_table tr.liste_titre > th,
+    .upinv-split-right #invoice_lines_table tr.invoice-line > td {
+        height: auto;
+    }
+    /* A 3rd elastic row absorbs the description's extra height so both numeric rows stay at the top */
+    .upinv-split-right #invoice_lines_table tr.invoice-line {
+        grid-template-rows: auto auto 1fr;
+        align-items: start;
+    }
+    .upinv-split-right #invoice_lines_table tr.invoice-line > td:nth-child(1) { grid-row: 1 / span 3; }
+    .upinv-split-right #invoice_lines_table tr.invoice-line > td:nth-child(9) { grid-row: 1 / span 2; align-self: center; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(2) { grid-column: 2; grid-row: 1; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(3) { grid-column: 3; grid-row: 1; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(4) { grid-column: 4; grid-row: 1; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(5) { grid-column: 5; grid-row: 1; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(6) { grid-column: 3; grid-row: 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(7) { grid-column: 4; grid-row: 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(8) { grid-column: 5; grid-row: 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(9) { grid-column: 6; grid-row: 1 / span 2; }
+    .upinv-split-right #invoice_lines_table tr.liste_titre > th {
+        text-align: right;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    /* Header label stays on the first row, level with Qty/Unit price/Discount/Base */
+    .upinv-split-right #invoice_lines_table tr.liste_titre > th:first-child {
+        text-align: left;
+        grid-row: 1;
+    }
+    .upinv-split-right #invoice_lines_table tr.invoice-line input.qtyline,
+    .upinv-split-right #invoice_lines_table tr.invoice-line input.puhline,
+    .upinv-split-right #invoice_lines_table tr.invoice-line input.remisepercentline,
+    .upinv-split-right #invoice_lines_table tr.invoice-line input.totalhtline,
+    .upinv-split-right #invoice_lines_table tr.invoice-line input.tvaline,
+    .upinv-split-right #invoice_lines_table tr.invoice-line input.totalvaline,
+    .upinv-split-right #invoice_lines_table tr.invoice-line input.totalttcline {
+        width: 100%;
+    }
+}
+/* Very narrow (tablet/phone): description takes the full width and the numbers go below it */
+@container (max-width: 520px) {
+    .upinv-split-right #invoice_lines_table tr.liste_titre,
+    .upinv-split-right #invoice_lines_table tr.invoice-line {
+        grid-template-columns: repeat(4, minmax(0, 1fr)) 22px;
+    }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(1) { grid-column: 1 / -1; grid-row: 1; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(2) { grid-column: 1; grid-row: 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(3) { grid-column: 2; grid-row: 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(4) { grid-column: 3; grid-row: 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(5) { grid-column: 4; grid-row: 2; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(6) { grid-column: 2; grid-row: 3; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(7) { grid-column: 3; grid-row: 3; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(8) { grid-column: 4; grid-row: 3; }
+    .upinv-split-right #invoice_lines_table tr > :nth-child(9) { grid-column: 5; grid-row: 2 / span 2; }
+    .upinv-split-right #invoice_lines_table tr.liste_titre > th:first-child { display: none; }
+    .upinv-split-right #invoice_lines_table tr.invoice-line { grid-template-rows: none; }
+    .upinv-split-right #invoice_lines_table tr.invoice-line > td:nth-child(1) { grid-row: 1; }
+    .upinv-split-right #invoice_lines_table tr.invoice-line > td:nth-child(9) { grid-row: 2 / span 2; }
 }

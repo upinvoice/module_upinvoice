@@ -517,23 +517,14 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
             // Select2 producto con valor preseleccionado
             print '<div class="product-select-container" style="margin-bottom:5px;">';
             print '<select id="line_product_' . $line_count . '" name="line_product_' . $line_count . '" class="product-select2" data-line="' . $line_count . '" style="width: 100%;">';
-            // Se añade una opción con el valor preseleccionado para inicializar Select2 con ese valor
-            print '<option value="'.intval($line['fk_product']).'" selected="selected">' . dol_escape_htmltag($line['product_ref'] . ' - ' . $line['product_label']) . '</option>';
+            // Se añade una opción con el valor preseleccionado para inicializar Select2 con ese valor.
+            // ref/label/type van en data-* para que la selección se pinte como badge (templateSelection)
+            print '<option value="'.intval($line['fk_product']).'" selected="selected"';
+            print ' data-ref="'.dol_escape_htmltag($line['product_ref'] ?? '').'"';
+            print ' data-label="'.dol_escape_htmltag($line['product_label'] ?? '').'"';
+            print ' data-type="'.intval($line_product_type).'">';
+            print dol_escape_htmltag($line['product_ref'] . ' - ' . $line['product_label']) . '</option>';
             print '</select>';
-            print '</div>';
-            
-            // Display product reference and label if found
-            print '<div class="product-match-info" style="margin-bottom:5px;">';
-            print '<span class="badge badge-info" style="border-radius: .25rem; padding: 5px; display: inline-block; margin-bottom: 5px;">'; // Basic styling
-            // Use product type from line data (which should reflect the matched product)
-            $product_type_icon = ($line_product_type == 1 ? 'concierge-bell' : 'cube'); // 1=Service, 0=Product
-            print ' <i class="fas fa-' . $product_type_icon . '" title="' . ($line_product_type == 1 ? $langs->trans("Service") : $langs->trans("Product")) . '"></i>&nbsp; ';
-            print $langs->trans("MatchingProduct") . ': ';
-            print '<strong>' . dol_escape_htmltag($line['product_ref']) . '</strong>'; // Display ref used for matching
-            if (!empty($line['product_label'])) {
-                print ' - ' . dol_escape_htmltag($line['product_label']); // Display fetched label
-            }
-            print '</span>';
             print '</div>';
         } else {
             // --- START: Product Type Selector and Product Select2 for non-matched/new lines ---

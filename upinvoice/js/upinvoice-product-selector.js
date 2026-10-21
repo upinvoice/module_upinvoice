@@ -57,12 +57,9 @@ var UpInvoiceProductSelector = {
                 // Limpiar el select2
                 $select.val(null).trigger('change');
                 
-                // Asegurarse explícitamente que se limpia el ID y la info visual
+                // Asegurarse explícitamente que se limpia el ID
                 // Limpiar el hidden field
                 $('input[name="line_fk_product_' + lineNum + '"]').val(0);
-                
-                // Eliminar el div de información
-                $('#line_row_' + lineNum).find('.product-match-info').remove();
                 
                 // Resetear la clase de fila
                 $('#line_row_' + lineNum).removeClass('has-product');
@@ -120,6 +117,9 @@ var UpInvoiceProductSelector = {
                 }
                 return data.text;
             },
+            templateSelection: function(data) {
+                return UpInvoiceProductSelector.renderSelectionBadge(data);
+            },
             escapeMarkup: function(markup) {
                 return markup; // Allow custom HTML in the dropdown
             }
@@ -152,9 +152,6 @@ var UpInvoiceProductSelector = {
             
             // Limpiar el ID del producto
             $('input[name="line_fk_product_' + lineNum + '"]').val(0);
-            
-            // Eliminar el div de información
-            $('#line_row_' + lineNum).find('.product-match-info').remove();
             
             // Resetear la clase de fila
             $('#line_row_' + lineNum).removeClass('has-product');
@@ -237,29 +234,44 @@ var UpInvoiceProductSelector = {
         // Update totals
         updateLineTotals(lineNum);
         
-        // Add visual indication that product is selected
-        var $lineRow = $('#line_row_' + lineNum);
-        $lineRow.addClass('has-product');
-        
-        // Add product match info at the top of the description cell
-        var $descCell = $lineRow.find('td:first');
-        
-        // Remove any existing product match info
-        $descCell.find('.product-match-info').remove();
-        
-        // Add new product match info
-        var productTypeIcon = productType == 1 ? 'concierge-bell' : 'cube'; // 1=Service, 0=Product
-        var productTypeText = productType == 1 ? upinvoiceimport_langs.Service : upinvoiceimport_langs.Product;
-        
-        var matchInfoHtml = '<div class="product-match-info" style="margin-bottom:5px;">';
-        matchInfoHtml += '<span class="badge badge-info" style="border-radius: .25rem; padding: 5px; display: inline-block; margin-bottom: 5px;">';
-        matchInfoHtml += '<i class="fas fa-' + productTypeIcon + '" title="' + productTypeText + '"></i>&nbsp; ' + upinvoiceimport_langs.MatchingProduct + ': ';
-        matchInfoHtml += '<strong>' + productRef + '</strong>';
-        matchInfoHtml += ' - ' + productLabel;
-        matchInfoHtml += '</span>';
-        matchInfoHtml += '</div>';
-        
-        $descCell.find('.product-select-container').after(matchInfoHtml);
+        // Add visual indication that product is selected (the badge itself is drawn by templateSelection)
+        $('#line_row_' + lineNum).addClass('has-product');
+    },
+
+    /**
+     * Render the selected product as a badge inside the Select2 box.
+     * Select2 prepends its own clear "×" to the same container; CSS places it at the end of the badge.
+     *
+     * @param {Object} data - Select2 data item (ajax result with .product, or preselected <option> with data-*)
+     * @return {jQuery|string}
+     */
+    renderSelectionBadge: function(data) {
+        if (!data.id) {
+            return data.text; // Placeholder
+        }
+
+        var ref = '', label = '', type = 0;
+        if (data.product) {
+            ref = data.product.ref;
+            label = data.product.label;
+            type = data.product.type;
+        } else if (data.element && $(data.element).data('ref') !== undefined) {
+            ref = String($(data.element).data('ref'));
+            label = String($(data.element).data('label') || '');
+            type = $(data.element).data('type');
+        } else {
+            return data.text;
+        }
+
+        var typeText = type == 1 ? upinvoiceimport_langs.Service : upinvoiceimport_langs.Product;
+        var $badge = $('<span class="upinv-prod-badge"></span>').attr('title', ref + (label ? ' - ' + label : ''));
+        $badge.append($('<i></i>').addClass('fas fa-' + (type == 1 ? 'concierge-bell' : 'cube')).attr('title', typeText));
+        var $text = $('<span class="upinv-prod-badge-text"></span>').append($('<strong></strong>').text(ref));
+        if (label) {
+            $text.append(document.createTextNode(' - ' + label));
+        }
+        $badge.append($text);
+        return $badge;
     },
     
     /**
@@ -270,9 +282,6 @@ var UpInvoiceProductSelector = {
     clearProductFromLine: function(lineNum) {
         // Clear hidden product ID field
         $('input[name="line_fk_product_' + lineNum + '"]').val(0);
-        
-        // Remove the product match info
-        $('#line_row_' + lineNum).find('.product-match-info').remove();
         
         // Remove visual indication that product is selected
         $('#line_row_' + lineNum).removeClass('has-product');
