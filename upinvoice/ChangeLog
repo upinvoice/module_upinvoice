@@ -1,13 +1,11 @@
-Unreleased
-- Invoice lines: the matched/selected product is shown as a badge (ref + label) inside the product search, with a red "x" to remove it; the separate "Matching product" label under the selector is gone
-- Fix: long product names widened the description column and pushed the lines table out of the right panel
-- Invoice lines on a narrow right column: numeric fields wrap into two rows (qty, unit price, discount, base / VAT %, VAT, total), with a two-row header so every label sits above its field; below 520 px the description takes the full width
-- Fix: when the layout stacks (window under 1100 px) the right column no longer collapses to zero width
-
 1.4.1 (2026-10-16)
 - Credits bar: "Add credits" button when credits are low or exhausted, linking to the UpInvoice plans page (shown only with API versions that send the link)
 - Credits bar uses the server-side low-credits flag (plan and bonus balances) instead of a fixed 20% when available
 - No-plan accounts: the bar shows "No credits available" with the link instead of an empty dash
+- Invoice lines: the matched/selected product is shown as a badge (ref + label) inside the product search, with a red "x" to remove it; the separate "Matching product" label under the selector is gone
+- Fix: long product names widened the description column and pushed the lines table out of the right panel
+- Invoice lines on a narrow right column: numeric fields wrap into two rows (qty, unit price, discount, base / VAT %, VAT, total), with a two-row header so every label sits above its field; below 520 px the description takes the full width
+- Fix: when the layout stacks (window under 1100 px) the right column no longer collapses to zero width
 
 1.4.0 (2026-07-07)
 - Cron auto-retries transient AI failures ("success" with no data) up to UPINVOICE_AI_MAX_RETRIES times (default 2); new ai_retries column (migration llx_upinvoice_files-add-ai_retries.sql)
