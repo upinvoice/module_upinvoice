@@ -93,19 +93,52 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 // --- START: Product Reference Lookup ---
 // Process lines and search for product matches by reference
 if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
+    // Comparison key for references: letters and digits only, unaccented and uppercase, so that
+    // "SWITCH'GSMIP4G12V" (invoice) matches "SWITCH_GSMIP4G12V" (Product::create replaces spaces,
+    // quotes, '/', ',' etc. with '_'), as is done with supplier VAT numbers
+    $productRefKey = function ($ref) {
+        return strtoupper(preg_replace('/[^\p{L}\p{N}]/u', '', dol_string_unaccent((string) $ref)));
+    };
+    // Product whose reference matches one of $refs (in order): exact match first, then by key
+    $findProductByRefs = function ($refs) use ($db, $productRefKey) {
+        foreach ($refs as $ref) {
+            $ref = trim((string) $ref);
+            $tokens = preg_split('/[^\p{L}\p{N}]+/u', $ref, -1, PREG_SPLIT_NO_EMPTY);
+            if (empty($tokens)) {
+                continue;
+            }
+            $sql = "SELECT p.rowid, p.ref, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type";
+            $sql .= " FROM ".MAIN_DB_PREFIX."product as p";
+            $sql .= " WHERE p.ref LIKE '%".implode('%', array_map(array($db, 'escape'), $tokens))."%'";
+            $sql .= " AND p.entity IN (".getEntity('product').")";
+            $sql .= " ORDER BY (p.ref = '".$db->escape($ref)."') DESC, p.rowid ASC";
+            $sql .= $db->plimit(50);
+
+            $resql = $db->query($sql);
+            if (!$resql) {
+                continue;
+            }
+            $match = null;
+            while ($obj = $db->fetch_object($resql)) {
+                if ($obj->ref === $ref || $productRefKey($obj->ref) === $productRefKey($ref)) {
+                    $match = $obj;
+                    break;
+                }
+            }
+            $db->free($resql);
+            if ($match) {
+                return $match;
+            }
+        }
+        return null;
+    };
+
     foreach ($invoice_data['lines'] as $key => $line) {
         // Check if the line has a product reference
         if (!empty($line['product_ref'])) {
-            // Search product by reference
-            $sql = "SELECT p.rowid, p.ref, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type";
-            $sql .= " FROM ".MAIN_DB_PREFIX."product as p";
-            $sql .= " WHERE p.ref = '".$db->escape($line['product_ref'])."'";
-            $sql .= " AND p.entity IN (".getEntity('product').")";
-
-            $resql = $db->query($sql);
-            if ($resql && $db->num_rows($resql) > 0) {
-                $product_obj = $db->fetch_object($resql);
-
+            // product_refs only comes when the invoice shows several references for the line
+            $product_obj = $findProductByRefs(!empty($line['product_refs']) && is_array($line['product_refs']) ? $line['product_refs'] : array($line['product_ref']));
+            if ($product_obj) {
                 // Check if product type matches (if provided in JSON)
                 $product_type_matches = true;
                 // Note: We use fk_product_type from the found product for consistency later
@@ -121,8 +154,9 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
                     $invoice_data['lines'][$key]['product_label'] = $product_obj->label;
                     // Ensure the line type reflects the matched product's type
                     $invoice_data['lines'][$key]['product_type'] = $product_obj->fk_product_type;
+                    // Keep the reference that matched (the line may carry several)
+                    $invoice_data['lines'][$key]['product_ref'] = $product_obj->ref;
                 }
-                $db->free($resql);
             }
         }
     }

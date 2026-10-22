@@ -1,3 +1,9 @@
+1.4.2 (2026-10-22)
+- Product matching by reference tries every reference the API sends for a line (product_refs: up to 3, e.g. article code and supplier item number), not only product_ref
+- References are compared on letters and digits only, ignoring accents and case: "SWITCH'GSMIP4G12V" on the invoice now matches the product Dolibarr stores as "SWITCH_GSMIP4G12V" (Dolibarr turns spaces, quotes, "/", "," etc. into "_" when creating a product)
+- The invoice line keeps the reference that matched
+- With the current UpInvoice API, invoices sent from the module always keep their detailed lines (they are no longer grouped into a single line on accounts without a subscription), and eco-tax or fee sub-lines no longer inherit the reference of the product above
+
 1.4.1 (2026-10-16)
 - Credits bar: "Add credits" button when credits are low or exhausted, linking to the UpInvoice plans page (shown only with API versions that send the link)
 - Credits bar uses the server-side low-credits flag (plan and bonus balances) instead of a fixed 20% when available
