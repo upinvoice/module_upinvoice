@@ -1,3 +1,8 @@
+1.4.3 (2026-10-23)
+- Register payment: new box next to the invoice header to pay the invoice while creating it (payment date, optional reference). The full amount is paid with the payment mode and bank account of the invoice, which is then created validated and closed as paid; if the payment fails, nothing is created
+- Fix: when a product is picked by hand on a line, its price and VAT rate are compared with the purchase price registered for the invoice supplier (Products > Purchase prices) instead of the product sale price and sale VAT. If that supplier has no purchase price for the product, the invoice price and VAT are kept and the search shows the product cost as information
+- Fix: price and VAT confirmations compare localized values correctly ("4,50" was read as 4)
+
 1.4.2 (2026-10-22)
 - Product matching by reference tries every reference the API sends for a line (product_refs: up to 3, e.g. article code and supplier item number), not only product_ref
 - References are compared on letters and digits only, ignoring accents and case: "SWITCH'GSMIP4G12V" on the invoice now matches the product Dolibarr stores as "SWITCH_GSMIP4G12V" (Dolibarr turns spaces, quotes, "/", "," etc. into "_" when creating a product)

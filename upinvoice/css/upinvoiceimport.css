@@ -2912,3 +2912,63 @@ a.upinv-btn-blue {
     .upinv-split-right #invoice_lines_table tr.invoice-line > td:nth-child(1) { grid-row: 1; }
     .upinv-split-right #invoice_lines_table tr.invoice-line > td:nth-child(9) { grid-row: 2 / span 2; }
 }
+
+/* Invoice header with the "Register payment" box in the free space on its right */
+.upinv-header-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-start;
+}
+.upinv-header-row > table.upinv-header-table {
+    flex: 0 1 auto;
+    width: auto;
+}
+.upinv-payment-box {
+    flex: 0 0 auto;
+    margin-left: auto;
+    padding: 8px 10px;
+    border: 1px dashed #cdd2d8;
+    border-radius: 5px;
+    background: #fafbfc;
+}
+.upinv-payment-box.upinv-payment-on {
+    flex: 0 0 40%;
+    min-width: 300px;
+    box-sizing: border-box;
+    border-style: solid;
+    border-color: #bfe3c6;
+    background: #f3faf4;
+}
+.upinv-payment-toggle {
+    font-weight: 600;
+    cursor: pointer;
+}
+.upinv-payment-fields {
+    margin-top: 6px;
+}
+.upinv-payment-field {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px 8px;
+    margin-bottom: 6px;
+}
+.upinv-payment-field > span:first-child {
+    min-width: 115px;
+}
+.upinv-payment-date {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+}
+.upinv-payment-field input[name="payment_num"] {
+    flex: 1 1 140px;
+    max-width: 220px;
+}
+.upinv-form-actions input[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

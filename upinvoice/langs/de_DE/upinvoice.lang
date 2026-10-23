@@ -72,8 +72,8 @@ AllFilesAreDuplicates=Alle Dateien sind bereits hochgeladen
 
 # Confirmations
 ConfirmDeleteFile=Sind Sie sicher, dass Sie diese Datei löschen möchten?
-ConfirmReplacePrice=Möchten Sie den aktuellen Preis durch den Produktpreis ersetzen?
-ConfirmReplaceVAT=Möchten Sie den aktuellen Mehrwertsteuersatz durch den des Produkts ersetzen?
+ConfirmReplacePrice=Möchten Sie den aktuellen Preis durch den Einkaufspreis dieses Lieferanten ersetzen?
+ConfirmReplaceVAT=Möchten Sie den aktuellen Mehrwertsteuersatz durch den des Einkaufspreises dieses Lieferanten ersetzen?
 Current=Aktuell
 New=Neu
 
@@ -177,6 +177,20 @@ Reference=Referenz
 Label=Bezeichnung
 Price=Preis
 VATRate=MwSt-Satz
+UpInvoiceSupplierBuyPrice=Einkaufspreis dieses Lieferanten
+UpInvoiceNoSupplierPrice=Kein Einkaufspreis dieses Lieferanten
+UpInvoiceCostPrice=Kosten
+UpInvoiceRegisterPayment=Zahlung erfassen
+UpInvoicePaymentDate=Zahlungsdatum
+UpInvoiceInvoiceDateShort=Rechnungsdatum
+UpInvoicePaymentNum=Referenz
+UpInvoicePaymentHelp=Der Gesamtbetrag wird mit der Zahlungsart und dem Bankkonto der Rechnung bezahlt; die Rechnung wird freigegeben erstellt.
+UpInvoicePaymentNeedsValidation=Um die Zahlung zu erfassen, wird die Rechnung freigegeben erstellt
+UpInvoicePaymentDateRequired=Geben Sie das Zahlungsdatum an
+UpInvoicePaymentModeRequired=Um die Zahlung zu erfassen, wählen Sie eine Zahlungsart
+UpInvoicePaymentAccountRequired=Um die Zahlung zu erfassen, wählen Sie ein Bankkonto
+UpInvoiceErrorCreatingPayment=Fehler beim Erfassen der Zahlung
+UpInvoiceCreatedValidatedAndPaid=Rechnung erstellt, freigegeben und bezahlt
 Actions=Aktionen
 
 # API Errors

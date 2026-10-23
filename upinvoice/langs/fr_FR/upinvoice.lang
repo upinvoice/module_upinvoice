@@ -72,8 +72,8 @@ AllFilesAreDuplicates=Tous les fichiers sont déjà téléchargés
 
 # Confirmations
 ConfirmDeleteFile=Êtes-vous sûr de vouloir supprimer ce fichier?
-ConfirmReplacePrice=Voulez-vous remplacer le prix actuel par le prix du produit?
-ConfirmReplaceVAT=Voulez-vous remplacer le taux de TVA actuel par celui du produit?
+ConfirmReplacePrice=Voulez-vous remplacer le prix actuel par le prix d'achat de ce fournisseur?
+ConfirmReplaceVAT=Voulez-vous remplacer le taux de TVA actuel par celui du prix d'achat de ce fournisseur?
 Current=Actuel
 New=Nouveau
 
@@ -177,6 +177,20 @@ Reference=Référence
 Label=Libellé
 Price=Prix
 VATRate=Taux de TVA
+UpInvoiceSupplierBuyPrice=Prix d'achat de ce fournisseur
+UpInvoiceNoSupplierPrice=Aucun prix d'achat de ce fournisseur
+UpInvoiceCostPrice=Coût de revient
+UpInvoiceRegisterPayment=Enregistrer le règlement
+UpInvoicePaymentDate=Date de règlement
+UpInvoiceInvoiceDateShort=Date facture
+UpInvoicePaymentNum=Référence
+UpInvoicePaymentHelp=Le total est réglé avec le mode de règlement et le compte bancaire de la facture, qui est créée validée.
+UpInvoicePaymentNeedsValidation=Pour enregistrer le règlement, la facture est créée validée
+UpInvoicePaymentDateRequired=Indiquez la date de règlement
+UpInvoicePaymentModeRequired=Pour enregistrer le règlement, choisissez un mode de règlement
+UpInvoicePaymentAccountRequired=Pour enregistrer le règlement, choisissez un compte bancaire
+UpInvoiceErrorCreatingPayment=Erreur lors de l'enregistrement du règlement
+UpInvoiceCreatedValidatedAndPaid=Facture créée, validée et réglée
 Actions=Actions
 
 # Errores de API

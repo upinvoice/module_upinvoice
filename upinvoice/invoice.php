@@ -218,6 +218,11 @@ $payment_options = $upinvoiceinvoice->getSupplierPaymentOptions($supplier->id);
 if ($action == 'create_invoice') {
     // Check if validation was requested
     $validate_invoice = (GETPOST('validate_invoice', 'int') == 1);
+    // Paying the invoice right away (Dolibarr only accepts payments on validated invoices)
+    $register_payment = (GETPOST('register_payment', 'int') == 1);
+    if ($register_payment) {
+        $validate_invoice = true;
+    }
 
     $date = dol_mktime(0, 0, 0, GETPOST('datemonth', 'none'), GETPOST('dateday', 'none'), GETPOST('dateyear', 'none'));
     if(!$date){
@@ -245,7 +250,11 @@ if ($action == 'create_invoice') {
         'extracted_total_tva' => isset($invoice_data['total_tva']) ? $invoice_data['total_tva'] : null,
         'extracted_total_ttc' => isset($invoice_data['total_ttc']) ? $invoice_data['total_ttc'] : null,
         'lines' => array(),
-        'validate' => $validate_invoice // Pass validation flag to creation function
+        'validate' => $validate_invoice, // Pass validation flag to creation function
+        'payment' => $register_payment ? array(
+            'date' => dol_mktime(12, 0, 0, GETPOSTINT('paydatemonth'), GETPOSTINT('paydateday'), GETPOSTINT('paydateyear')),
+            'num_payment' => GETPOST('payment_num', 'alphanohtml'),
+        ) : null
     );
 
     // Process invoice lines
@@ -386,8 +395,9 @@ if (!empty($warnings)) {
     print '</div>';
 }
 
-// Invoice header
-print '<table class="border centpercent">';
+// Invoice header, with the payment box in the free space on its right
+print '<div class="upinv-header-row">';
+print '<table class="border upinv-header-table">';
 
 // Invoice reference
 print '<tr>';
@@ -445,6 +455,31 @@ print '</td>';
 print '</tr>';
 
 print '</table>';
+
+// Register the payment together with the invoice (handy when entering invoices while reconciling the bank)
+if (!empty($user->rights->fournisseur->facture->creer)) {
+    $register_payment_checked = ($action == 'create_invoice' && GETPOST('register_payment', 'int') == 1);
+    $paydate = dol_mktime(12, 0, 0, GETPOSTINT('paydatemonth'), GETPOSTINT('paydateday'), GETPOSTINT('paydateyear'));
+    print '<div class="upinv-payment-box'.($register_payment_checked ? ' upinv-payment-on' : '').'">';
+    print '<label class="upinv-payment-toggle"><input type="checkbox" name="register_payment" id="register_payment" value="1"'.($register_payment_checked ? ' checked' : '').'> ';
+    print $langs->trans("UpInvoiceRegisterPayment").'</label>';
+    print '<div class="upinv-payment-fields"'.($register_payment_checked ? '' : ' style="display:none"').'>';
+    print '<div class="upinv-payment-field"><span class="fieldrequired">'.$langs->trans("UpInvoicePaymentDate").'</span>';
+    print '<span class="upinv-payment-date">';
+    print $form->selectDate($paydate ? $paydate : dol_now(), 'paydate', 0, 0, 0, "invoice_form", 1, 1);
+    print '<span class="opacitymedium">|</span>';
+    print '<button type="button" id="upinv-paydate-from-invoice" class="dpInvisibleButtons datenowlink">'.$langs->trans("UpInvoiceInvoiceDateShort").'</button>';
+    print '</span>';
+    print '</div>';
+    print '<div class="upinv-payment-field"><span>'.$langs->trans("UpInvoicePaymentNum").'</span>';
+    print '<input type="text" name="payment_num" value="'.dol_escape_htmltag(GETPOST('payment_num', 'alphanohtml')).'" class="flat">';
+    print '</div>';
+    print '<div class="upinv-payment-field"><span>'.$langs->trans("Amount").'</span><strong id="upinv-payment-amount"></strong></div>';
+    print '<div class="opacitymedium small">'.$langs->trans("UpInvoicePaymentHelp").'</div>';
+    print '</div>';
+    print '</div>';
+}
+print '</div>'; // Close upinv-header-row
 
 // Invoice totals (stacked under the header)
 print '<table class="border centpercent upinv-totals">';
@@ -669,6 +704,8 @@ print '</div>';
     // Make sure PHP variables used by JS are defined *before* the script that uses them
     var upinvoiceimport_root = '<?php echo dirname($_SERVER['PHP_SELF']); ?>';
     var upinvoiceimport_token = '<?php echo newToken(); ?>';
+    var upinvoiceimport_socid = <?php echo (int) $supplier->id; ?>;
+    var upinvoiceimport_decimal_separator = '<?php echo dol_escape_js($langs->transnoentitiesnoconv("SeparatorDecimal")); ?>';
     var upinvoiceimport_langs = {
         'Searching': '<?php echo dol_escape_js($langs->trans("Searching")); ?>',
         'FoundSuppliers': '<?php echo dol_escape_js($langs->trans("FoundSuppliers")); ?>',
@@ -697,9 +734,13 @@ print '</div>';
         'Label': '<?php echo dol_escape_js($langs->trans("Label")); ?>',
         'Price': '<?php echo dol_escape_js($langs->trans("Price")); ?>',
         'VATRate': '<?php echo dol_escape_js($langs->trans("VATRate")); ?>',
+        'PaymentNeedsValidation': '<?php echo dol_escape_js($langs->transnoentitiesnoconv("UpInvoicePaymentNeedsValidation")); ?>',
+        'SupplierBuyPrice': '<?php echo dol_escape_js($langs->trans("UpInvoiceSupplierBuyPrice")); ?>',
+        'NoSupplierPrice': '<?php echo dol_escape_js($langs->trans("UpInvoiceNoSupplierPrice")); ?>',
+        'CostPrice': '<?php echo dol_escape_js($langs->trans("UpInvoiceCostPrice")); ?>',
         'ConfirmDeleteFile': '<?php echo $langs->trans("ConfirmDeleteFile"); ?>',
-        'ConfirmReplacePrice': '<?php echo $langs->trans("ConfirmReplacePrice"); ?>',
-        'ConfirmReplaceVAT': '<?php echo $langs->trans("ConfirmReplaceVAT"); ?>',
+        'ConfirmReplacePrice': '<?php echo dol_escape_js($langs->transnoentitiesnoconv("ConfirmReplacePrice")); ?>',
+        'ConfirmReplaceVAT': '<?php echo dol_escape_js($langs->transnoentitiesnoconv("ConfirmReplaceVAT")); ?>',
         'Current': '<?php echo dol_escape_js($langs->trans("Current")); ?>',
         'New': '<?php echo dol_escape_js($langs->trans("New")); ?>'
     };
@@ -761,6 +802,24 @@ $(document).ready(function() {
     upinvAutoPickMethod();
     max_input_vars_check();
 
+    // Registering the payment needs a validated invoice: the draft button is disabled meanwhile
+    $('#register_payment').on('change', function() {
+        var on = $(this).is(':checked');
+        $('.upinv-payment-fields').toggle(on);
+        $('.upinv-payment-box').toggleClass('upinv-payment-on', on);
+        $("input[name='create_only']").prop('disabled', on).attr('title', on ? upinvoiceimport_langs.PaymentNeedsValidation : '');
+        upinvSyncPaymentAmount();
+    }).trigger('change');
+    $('#total_ttc').on('change input', upinvSyncPaymentAmount);
+    // Payment date = invoice date (the "Now" link next to it gives today)
+    $('#upinv-paydate-from-invoice').on('click', function(e) {
+        e.preventDefault();
+        $('#paydate').val($('#date').val());
+        $.each(['day', 'month', 'year'], function(i, part) {
+            $('#paydate' + part).val($('#date' + part).val());
+        });
+    });
+
     // Manage "Create Invoice" button (without validating)
     $("input[name='create_only']").click(function() {
         // Ensure validate_invoice field is 0
@@ -769,6 +828,11 @@ $(document).ready(function() {
         max_input_vars_check();
     });
 });
+
+// Amount of the payment = invoice total (shown in the payment box)
+function upinvSyncPaymentAmount() {
+    $('#upinv-payment-amount').text($('#total_ttc').val());
+}
 
 function max_input_vars_check() {
     var maxInputVars = parseInt($('#max_input_vars').val());
@@ -897,6 +961,7 @@ function updateInvoiceTotals() {
     $("#total_tva").val(t.tva.toFixed(2));
     $("#total_ttc").val(t.ttc.toFixed(2));
     upinvReconcile(t, lines);
+    upinvSyncPaymentAmount();
 }
 
 // Apply a method (updates display + hidden field + button state)

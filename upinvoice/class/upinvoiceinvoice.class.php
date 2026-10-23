@@ -53,6 +53,23 @@ class UpInvoiceInvoice
             return $result;
         }
 
+        // Payment registered together with the invoice: check its data before creating anything
+        $payment = !empty($invoiceData['payment']) ? $invoiceData['payment'] : null;
+        if ($payment) {
+            if (empty($payment['date'])) {
+                $result['message'] = $langs->trans('UpInvoicePaymentDateRequired');
+                return $result;
+            }
+            if (empty($invoiceData['mode_reglement_id'])) {
+                $result['message'] = $langs->trans('UpInvoicePaymentModeRequired');
+                return $result;
+            }
+            if (isModEnabled('banque') && empty($invoiceData['fk_account'])) {
+                $result['message'] = $langs->trans('UpInvoicePaymentAccountRequired');
+                return $result;
+            }
+        }
+
         $this->db->begin();
 
         try {
@@ -136,6 +153,10 @@ class UpInvoiceInvoice
                 if ($result_validate < 0) {
                     throw new Exception($langs->trans('ErrorValidatingInvoice') . ': ' . $invoice->error);
                 }
+
+                if ($payment) {
+                    $this->registerPayment($invoice, $invoiceData, $user);
+                }
             }
 
             // Attach document if provided
@@ -148,7 +169,11 @@ class UpInvoiceInvoice
 
             $this->db->commit();
 
-            if ($shouldValidate) {
+            if ($shouldValidate && $payment) {
+                $result['status'] = 'success';
+                $result['id'] = $invoice_id;
+                $result['message'] = $langs->trans('UpInvoiceCreatedValidatedAndPaid');
+            } elseif ($shouldValidate) {
                 $result['status'] = 'success';
                 $result['id'] = $invoice_id;
                 $result['message'] = $langs->trans('InvoiceCreatedAndValidatedSuccessfully');
@@ -163,6 +188,53 @@ class UpInvoiceInvoice
             $this->db->rollback();
             $result['message'] = $e->getMessage();
             return $result;
+        }
+    }
+
+    /**
+     * Pay the whole remaining amount of a validated invoice, as Dolibarr does from the supplier
+     * invoice card: payment + bank line, and the invoice is closed as paid. Runs inside the
+     * transaction of createInvoice, so a failure here also cancels the invoice.
+     *
+     * @param FactureFournisseur $invoice Validated invoice
+     * @param array $invoiceData Form data (payment, mode_reglement_id, fk_account)
+     * @param User $user User registering the payment
+     * @return void
+     * @throws Exception
+     */
+    private function registerPayment($invoice, $invoiceData, $user)
+    {
+        global $langs;
+
+        require_once DOL_DOCUMENT_ROOT.'/fourn/class/paiementfourn.class.php';
+
+        // Reload so totals include the reconciliation adjustments
+        $invoice->fetch($invoice->id);
+        $amount = (float) price2num($invoice->getRemainToPay(), 'MT');
+        if ($amount <= 0) {
+            return;
+        }
+
+        $paiement = new PaiementFourn($this->db);
+        $paiement->datepaye = $invoiceData['payment']['date'];
+        $paiement->amounts = array($invoice->id => $amount);
+        $paiement->multicurrency_code = array($invoice->id => $invoice->multicurrency_code);
+        $paiement->multicurrency_tx = array($invoice->id => $invoice->multicurrency_tx);
+        $paiement->paiementid = (int) $invoiceData['mode_reglement_id'];
+        $paiement->num_payment = $invoiceData['payment']['num_payment'];
+        $paiement->fk_account = (int) $invoiceData['fk_account'];
+
+        $thirdparty = new Societe($this->db);
+        $thirdparty->fetch($invoice->socid);
+
+        if ($paiement->create($user, 1, $thirdparty) < 0) {
+            throw new Exception($langs->trans('UpInvoiceErrorCreatingPayment') . ': ' . $langs->trans($paiement->error));
+        }
+        if (isModEnabled('banque')) {
+            $result = $paiement->addPaymentToBank($user, 'payment_supplier', '(SupplierInvoicePayment)', (int) $invoiceData['fk_account'], '', '');
+            if ($result < 0) {
+                throw new Exception($langs->trans('UpInvoiceErrorCreatingPayment') . ': ' . $langs->trans($paiement->error));
+            }
         }
     }
 

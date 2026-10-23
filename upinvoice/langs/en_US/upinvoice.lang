@@ -73,8 +73,8 @@ AllFilesAreDuplicates=All files are already uploaded
 
 # Confirmations
 ConfirmDeleteFile=Are you sure you want to delete this file?
-ConfirmReplacePrice=Do you want to replace the current price with the product price?
-ConfirmReplaceVAT=Do you want to replace the current VAT rate with the product´s rate?
+ConfirmReplacePrice=Do you want to replace the current price with the purchase price from this supplier?
+ConfirmReplaceVAT=Do you want to replace the current VAT rate with the one of the purchase price from this supplier?
 Current=Current
 New=New
 
@@ -178,6 +178,20 @@ Reference=Reference
 Label=Label
 Price=Price
 VATRate=VAT Rate
+UpInvoiceSupplierBuyPrice=Purchase price from this supplier
+UpInvoiceNoSupplierPrice=No purchase price from this supplier
+UpInvoiceCostPrice=Cost
+UpInvoiceRegisterPayment=Register payment
+UpInvoicePaymentDate=Payment date
+UpInvoiceInvoiceDateShort=Invoice date
+UpInvoicePaymentNum=Reference
+UpInvoicePaymentHelp=The total is paid with the payment mode and bank account of the invoice, which is created validated.
+UpInvoicePaymentNeedsValidation=To register the payment the invoice is created validated
+UpInvoicePaymentDateRequired=Enter the payment date
+UpInvoicePaymentModeRequired=To register the payment, choose a payment mode
+UpInvoicePaymentAccountRequired=To register the payment, choose a bank account
+UpInvoiceErrorCreatingPayment=Error registering the payment
+UpInvoiceCreatedValidatedAndPaid=Invoice created, validated and paid
 Actions=Actions
 
 # API Errors

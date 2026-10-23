@@ -64,6 +64,7 @@ $token = GETPOST('token', 'alpha');
 $search = GETPOST('search', 'alpha');
 $product_type = GETPOST('type', 'int'); // 0 = product, 1 = service, -1 = both
 $limit = GETPOST('limit', 'int') ?: 10;
+$socid = GETPOST('socid', 'int'); // Supplier of the invoice being imported
 
 // CSRF protection
 if (!verifyCsrf()) {
@@ -79,7 +80,7 @@ if (empty($search)) {
 }
 
 // Search for products
-$result = searchProducts($search, $product_type, $limit);
+$result = searchProducts($search, $product_type, $limit, $socid);
 
 // Return JSON response
 header('Content-Type: application/json');
@@ -91,9 +92,10 @@ echo json_encode($result);
  * @param string $search Search term
  * @param int $product_type Product type (-1 for both, 0 for product, 1 for service)
  * @param int $limit Maximum number of results
+ * @param int $socid Supplier whose purchase prices are returned (0 = none)
  * @return array Search results
  */
-function searchProducts($search, $product_type = -1, $limit = 10)
+function searchProducts($search, $product_type = -1, $limit = 10, $socid = 0)
 {
     global $db, $conf, $langs;
     
@@ -107,6 +109,7 @@ function searchProducts($search, $product_type = -1, $limit = 10)
     $search = trim($db->escape($search));
     $product_type = (int)$product_type;
     $limit = (int)$limit;
+    $socid = (int)$socid;
     
     // Prepare search terms for SQL
     $searchTerms = preg_split('/\s+/', $search);
@@ -125,7 +128,7 @@ function searchProducts($search, $product_type = -1, $limit = 10)
     }
     
     // Build the SQL query
-    $sql = "SELECT p.rowid, p.ref, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type, p.tosell";
+    $sql = "SELECT p.rowid, p.ref, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type, p.tosell, p.cost_price, p.pmp";
     $sql .= " FROM ".MAIN_DB_PREFIX."product as p";
     $sql .= " WHERE (".implode(' AND ', $searchClauses).")";
     
@@ -156,27 +159,80 @@ function searchProducts($search, $product_type = -1, $limit = 10)
         return $result;
     }
     
-    // Parse results
+    $rows = array();
     while ($obj = $db->fetch_object($resql)) {
+        $rows[(int) $obj->rowid] = $obj;
+    }
+    $db->free($resql);
+
+    // This is a supplier invoice: prices and VAT must come from what this supplier charges us
+    // (product_fournisseur_price), never from the sale price of the product
+    $supplierPrices = getSupplierPrices(array_keys($rows), $socid);
+
+    // Parse results
+    foreach ($rows as $id => $obj) {
+        $buy = isset($supplierPrices[$id]) ? $supplierPrices[$id] : null;
+        // Informative purchase cost when this supplier has no price for the product
+        $cost = (float) $obj->cost_price > 0 ? $obj->cost_price : ((float) $obj->pmp > 0 ? $obj->pmp : null);
         $product = array(
             'id' => $obj->rowid,
             'ref' => $obj->ref,
             'label' => $obj->label,
             'description' => $obj->description,
-            'price' => price($obj->price),
-            'price_ttc' => price($obj->price_ttc),
-            'tva_tx' => $obj->tva_tx,
+            'buy_price' => $buy ? (float) price2num($buy->unitprice, 'MU') : null,
+            'buy_price_label' => $buy ? price($buy->unitprice) : '',
+            'buy_tva_tx' => $buy ? (float) $buy->tva_tx : null,
+            'ref_fourn' => $buy ? $buy->ref_fourn : '',
+            'cost_price_label' => $cost !== null ? price($cost) : '',
             'type' => $obj->fk_product_type,
             'type_label' => $obj->fk_product_type == 1 ? $langs->trans("Service") : $langs->trans("Product"),
             'status' => $obj->tosell
         );
-        
+
         $result['results'][] = $product;
     }
-    
+
     $result['message'] = sprintf($langs->trans("ProductsFound"), $num);
     
     return $result;
+}
+
+/**
+ * Purchase price of each product for a supplier. When the supplier has several prices for a
+ * product (by quantity), the one for the smallest quantity is used, the most recent on a tie.
+ *
+ * @param int[] $productIds Product IDs
+ * @param int $socid Supplier ID
+ * @return array Supplier price row (unitprice, tva_tx, ref_fourn) indexed by product ID
+ */
+function getSupplierPrices($productIds, $socid)
+{
+    global $db;
+
+    $prices = array();
+    if (empty($productIds) || $socid <= 0) {
+        return $prices;
+    }
+
+    $sql = "SELECT pfp.fk_product, pfp.unitprice, pfp.tva_tx, pfp.ref_fourn";
+    $sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price as pfp";
+    $sql .= " WHERE pfp.fk_soc = ".((int) $socid);
+    $sql .= " AND pfp.fk_product IN (".implode(',', array_map('intval', $productIds)).")";
+    $sql .= " AND pfp.entity IN (".getEntity('productsupplierprice').")";
+    $sql .= " ORDER BY pfp.fk_product, pfp.quantity ASC, pfp.rowid DESC";
+
+    $resql = $db->query($sql);
+    if (!$resql) {
+        return $prices;
+    }
+    while ($obj = $db->fetch_object($resql)) {
+        if (!isset($prices[(int) $obj->fk_product])) {
+            $prices[(int) $obj->fk_product] = $obj;
+        }
+    }
+    $db->free($resql);
+
+    return $prices;
 }
 
 /**

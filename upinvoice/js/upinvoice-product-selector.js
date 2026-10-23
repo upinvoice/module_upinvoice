@@ -80,6 +80,7 @@ var UpInvoiceProductSelector = {
                     return {
                         search: params.term,
                         type: $('#line_type_' + lineNum).val() || '-1', // Get the current product type value
+                        socid: upinvoiceimport_socid, // Purchase prices are those of the invoice supplier
                         token: upinvoiceimport_token
                     };
                 },
@@ -90,6 +91,11 @@ var UpInvoiceProductSelector = {
                                 var typeBadge = product.type == 1 ? 
                                     '<span class="badge badge-success">' + upinvoiceimport_langs.Service + '</span>' : 
                                     '<span class="badge badge-info">' + upinvoiceimport_langs.Product + '</span>';
+                                var priceInfo = product.buy_price !== null ?
+                                    upinvoiceimport_langs.SupplierBuyPrice + ': ' + product.buy_price_label + ' | ' +
+                                    upinvoiceimport_langs.VATRate + ': ' + product.buy_tva_tx + '%' :
+                                    upinvoiceimport_langs.NoSupplierPrice +
+                                    (product.cost_price_label ? ' | ' + upinvoiceimport_langs.CostPrice + ': ' + product.cost_price_label : '');
                                 
                                 return {
                                     id: product.id,
@@ -98,8 +104,7 @@ var UpInvoiceProductSelector = {
                                           '<span class="product-ref">' + product.ref + '</span> - ' +
                                           '<span class="product-label">' + product.label + '</span> ' +
                                           typeBadge +
-                                          '<div class="product-price">' + upinvoiceimport_langs.Price + ': ' + product.price + ' | ' + 
-                                          upinvoiceimport_langs.VATRate + ': ' + product.tva_tx + '%</div>' +
+                                          '<div class="product-price">' + priceInfo + '</div>' +
                                           '</div>',
                                     product: product
                                 };
@@ -138,8 +143,8 @@ var UpInvoiceProductSelector = {
                     product.ref,
                     product.label,
                     product.description,
-                    product.price.replace(/[^0-9,-]/g, '').replace(',', '.'),
-                    product.tva_tx,
+                    product.buy_price,
+                    product.buy_tva_tx,
                     product.type
                 );
             }
@@ -179,8 +184,8 @@ var UpInvoiceProductSelector = {
      * @param {string} productRef - Product reference
      * @param {string} productLabel - Product label
      * @param {string} productDesc - Product description
-     * @param {number} productPrice - Product price
-     * @param {number} productVat - Product VAT rate
+     * @param {?number} productPrice - Purchase price from the invoice supplier (null if it has none)
+     * @param {?number} productVat - VAT rate of that purchase price (null if none)
      * @param {number} productType - Product type (0=product, 1=service)
      */
     applyProductToLine: function(lineNum, productId, productRef, productLabel, productDesc, productPrice, productVat, productType) {
@@ -197,32 +202,13 @@ var UpInvoiceProductSelector = {
         }
         $('textarea[name="line_desc_' + lineNum + '"]').val(descText);
         
-        // Comprobar y actualizar el precio unitario con confirmación si es necesario
-        var currentPrice = $('input[name="line_pu_ht_' + lineNum + '"]').val();
-        if (currentPrice && parseFloat(currentPrice) > 0 && parseFloat(currentPrice) !== parseFloat(productPrice)) {
-            if (confirm(upinvoiceimport_langs.ConfirmReplacePrice.replace('&iquest;','¿') + "\n" + 
-                      upinvoiceimport_langs.Current + ": " + currentPrice + "\n" + 
-                      upinvoiceimport_langs.New + ": " + productPrice)) {
-                $('input[name="line_pu_ht_' + lineNum + '"]').val(productPrice);
-            }
-            // Si no confirma, mantenemos el precio actual
-        } else {
-            // Si no hay precio o es 0, actualizamos directamente
-            $('input[name="line_pu_ht_' + lineNum + '"]').val(productPrice);
+        // Precio e IVA: solo se comparan con el precio de compra a este proveedor. Si no tiene
+        // ninguno registrado, se mantienen los de la factura (el precio de venta no sirve aquí)
+        if (productPrice !== null) {
+            this.offerLineValue(lineNum, 'line_pu_ht_', productPrice, upinvoiceimport_langs.ConfirmReplacePrice.replace('&iquest;', '¿'), '', true);
         }
-        
-        // Comprobar y actualizar la tasa de IVA con confirmación si es necesario
-        var currentVat = $('input[name="line_tva_tx_' + lineNum + '"]').val();
-        if (currentVat && parseFloat(currentVat) >= 0 && parseFloat(currentVat) !== parseFloat(productVat)) {
-            if (confirm(upinvoiceimport_langs.ConfirmReplaceVAT + "\n" + 
-                      upinvoiceimport_langs.Current + ": " + currentVat + "%\n" + 
-                      upinvoiceimport_langs.New + ": " + productVat + "%")) {
-                $('input[name="line_tva_tx_' + lineNum + '"]').val(productVat);
-            }
-            // Si no confirma, mantenemos la tasa actual
-        } else {
-            // Si no hay tasa o es 0, actualizamos directamente
-            $('input[name="line_tva_tx_' + lineNum + '"]').val(productVat);
+        if (productVat !== null) {
+            this.offerLineValue(lineNum, 'line_tva_tx_', productVat, upinvoiceimport_langs.ConfirmReplaceVAT, '%', false);
         }
         
         // If quantity is empty or 0, set it to 1
@@ -236,6 +222,33 @@ var UpInvoiceProductSelector = {
         
         // Add visual indication that product is selected (the badge itself is drawn by templateSelection)
         $('#line_row_' + lineNum).addClass('has-product');
+    },
+
+    /**
+     * Put a product value in a line field, asking first when the field already holds a different one
+     *
+     * @param {number} lineNum - Line number
+     * @param {string} fieldPrefix - Input name without the line number
+     * @param {number} newValue - Value from the product
+     * @param {string} question - Confirmation text
+     * @param {string} unit - Suffix shown after the values
+     * @param {boolean} zeroIsEmpty - A 0 in the field is replaced without asking
+     */
+    offerLineValue: function(lineNum, fieldPrefix, newValue, question, unit, zeroIsEmpty) {
+        var $input = $('input[name="' + fieldPrefix + lineNum + '"]');
+        var currentText = $input.val();
+        var current = parseLocalizedFloat(currentText);
+        var newText = String(newValue).replace('.', upinvoiceimport_decimal_separator);
+        if (Math.abs(current - newValue) < 0.000001) {
+            return;
+        }
+        var isEmpty = !$.trim(currentText || '') || (zeroIsEmpty && current === 0);
+        if (isEmpty || confirm(question + "\n" +
+                      upinvoiceimport_langs.Current + ": " + currentText + unit + "\n" +
+                      upinvoiceimport_langs.New + ": " + newText + unit)) {
+            $input.val(newText);
+        }
+        // Si no confirma, se mantiene el valor de la factura
     },
 
     /**

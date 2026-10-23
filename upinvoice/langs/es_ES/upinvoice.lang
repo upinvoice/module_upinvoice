@@ -73,8 +73,8 @@ AllFilesAreDuplicates=Todos los archivos ya están subidos
 
 # Confirmaciones
 ConfirmDeleteFile=¿Está seguro de que desea eliminar este archivo?
-ConfirmReplacePrice=¿Desea reemplazar el precio actual con el precio del producto?
-ConfirmReplaceVAT=¿Desea reemplazar la tasa de IVA actual con la del producto?
+ConfirmReplacePrice=¿Desea reemplazar el precio actual con el precio de compra a este proveedor?
+ConfirmReplaceVAT=¿Desea reemplazar la tasa de IVA actual con la del precio de compra a este proveedor?
 Current=Actual
 New=Nuevo
 
@@ -178,6 +178,20 @@ Reference=Referencia
 Label=Etiqueta
 Price=Precio
 VATRate=Tasa de IVA
+UpInvoiceSupplierBuyPrice=Precio de compra a este proveedor
+UpInvoiceNoSupplierPrice=Sin precio de compra de este proveedor
+UpInvoiceCostPrice=Coste
+UpInvoiceRegisterPayment=Registrar el pago
+UpInvoicePaymentDate=Fecha de pago
+UpInvoiceInvoiceDateShort=Fecha factura
+UpInvoicePaymentNum=Referencia
+UpInvoicePaymentHelp=Se paga el total con el modo de pago y la cuenta bancaria de la factura, que se crea validada.
+UpInvoicePaymentNeedsValidation=Para registrar el pago la factura se crea validada
+UpInvoicePaymentDateRequired=Indica la fecha de pago
+UpInvoicePaymentModeRequired=Para registrar el pago indica el modo de pago
+UpInvoicePaymentAccountRequired=Para registrar el pago indica la cuenta bancaria
+UpInvoiceErrorCreatingPayment=Error al registrar el pago
+UpInvoiceCreatedValidatedAndPaid=Factura creada, validada y pagada
 Actions=Acciones
 
 # Errores de API
