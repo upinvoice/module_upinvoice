@@ -47,7 +47,9 @@ class modUpInvoice extends DolibarrModules
         $this->need_dolibarr_version = array(11, 0);
         $this->langfiles = array("upinvoice@upinvoice");
 
-        // Constants
+        // Constants (name, type, value, note, visible, entity, deleteonunactive).
+        // deleteonunactive = 0: settings such as the API key must survive disabling the module,
+        // which is the usual way to apply an update
         $this->const = array(
             0 => array(
                 'UPINVOICE_API_URL',
@@ -56,7 +58,7 @@ class modUpInvoice extends DolibarrModules
                 'URL for UpInvoice API',
                 0,
                 'current',
-                1
+                0
             ),
             1 => array(
                 'UPINVOICE_API_KEY',
@@ -65,7 +67,7 @@ class modUpInvoice extends DolibarrModules
                 'API Key for UpInvoice',
                 0,
                 'current',
-                1
+                0
             ),
             2 => array(
                 'UPINVOICE_EMAILCOLLECTOR_ENABLED',
@@ -74,7 +76,7 @@ class modUpInvoice extends DolibarrModules
                 'Enable UpInvoice operation for EmailCollector (import invoice attachments from emails)',
                 0,
                 'current',
-                1
+                0
             ),
             3 => array(
                 'UPINVOICE_AUTO_AI_PROCESSING',
@@ -83,7 +85,7 @@ class modUpInvoice extends DolibarrModules
                 'Enable automatic AI processing of pending files by cron',
                 0,
                 'current',
-                1
+                0
             ),
             4 => array(
                 'UPINVOICE_EMAIL_MAX_FILE_SIZE',
@@ -92,7 +94,7 @@ class modUpInvoice extends DolibarrModules
                 'Maximum size in bytes for an email attachment to be imported (default 10 MB)',
                 0,
                 'current',
-                1
+                0
             )
         );
 
