@@ -1,3 +1,10 @@
+1.4.5 (2026-11-02)
+- An invoice is never sent twice to the UpInvoice API: processing now takes an atomic lease with an owner token, shared by the web page and the cron, so two tabs, two users or the cron cannot process the same file at the same time. A file already processed with data, or with a supplier or invoice already set, is refused by the server
+- A late result (lease expired and taken by another worker, or file deleted) is discarded instead of overwriting the file, and processing never overwrites the supplier or invoice chosen meanwhile
+- The API call has a timeout below the lease (UPINVOICE_STUCK_SECONDS, minimum 60), so a retry can never overlap a request still waiting for the API
+- Idempotency-Key sent to the API, stable across retries of the same attempt: a retry after a lost response is replayed by the API without charging credits again. When the API is still processing (409) the file shows it and the attempt is not counted as a failure
+- Update: disable and enable the module again after updating, to add the new columns of llx_upinvoice_files. If this is forgotten, the upload page and the module setup now show a warning naming the missing columns, with a link to the module list, instead of an empty file list
+
 1.4.4 (2026-10-23)
 - Fix: the API key and the other module settings were deleted when the module was disabled (the usual step when updating it), so the key had to be entered again after each update
 
