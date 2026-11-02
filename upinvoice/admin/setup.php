@@ -181,6 +181,10 @@ $linkback = '<a href="'.($backtopage ?: DOL_URL_ROOT.'/admin/modules.php?restore
 
 print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 
+// Module files updated without disabling/enabling the module: new columns are missing
+dol_include_once('/upinvoice/class/upinvoicefiles.class.php');
+print UpInvoiceFiles::getSchemaWarning($db);
+
 // Configuration header
 $head = upinvoiceimport_admin_prepare_head();
 print dol_get_fiche_head($head, 'settings', $langs->trans("Module500000Name"), -1, "bill");

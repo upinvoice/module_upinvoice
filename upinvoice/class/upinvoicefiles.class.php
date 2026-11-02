@@ -123,6 +123,23 @@ class UpInvoiceFiles extends CommonObject
     public $calc_method;
 
     /**
+     * @var string|null Owner of the current processing lease (random token set by claimForProcessing())
+     */
+    public $processing_token;
+
+    /**
+     * @var int|null Start of the current processing lease
+     */
+    public $processing_started;
+
+    /**
+     * @var string|null Idempotency-Key sent to the UpInvoice API for the current logical attempt.
+     *                  Kept across retries of the same attempt so the API never charges twice,
+     *                  cleared once the API has answered 200 (a new attempt then gets a new key).
+     */
+    public $idempotency_key;
+
+    /**
      * @var string Table name
      */
     public $table_element = 'upinvoice_files';
@@ -276,7 +293,8 @@ class UpInvoiceFiles extends CommonObject
     {
         $sql = "SELECT rowid, file_path, original_filename, file_size, file_type, api_json,";
         $sql .= " date_creation, fk_user_creat, date_modification, fk_user_modif,";
-        $sql .= " import_step, fk_supplier, fk_invoice, status, processing, import_error, ai_retries, source, file_hash, import_rule_label, calc_method";
+        $sql .= " import_step, fk_supplier, fk_invoice, status, processing, import_error, ai_retries, source, file_hash, import_rule_label, calc_method,";
+        $sql .= " processing_token, processing_started, idempotency_key";
         $sql .= " FROM " . MAIN_DB_PREFIX . $this->table_element;
         $sql .= " WHERE rowid = " . (int) $id;
         
@@ -306,7 +324,10 @@ class UpInvoiceFiles extends CommonObject
                 $this->file_hash = isset($obj->file_hash) ? $obj->file_hash : null;
                 $this->import_rule_label = isset($obj->import_rule_label) ? $obj->import_rule_label : null;
                 $this->calc_method = isset($obj->calc_method) ? $obj->calc_method : null;
-                
+                $this->processing_token = $obj->processing_token;
+                $this->processing_started = $obj->processing_started ? $this->db->jdate($obj->processing_started) : null;
+                $this->idempotency_key = $obj->idempotency_key;
+
                 $this->db->free($resql);
                 return 1;
             } else {
@@ -442,6 +463,217 @@ class UpInvoiceFiles extends CommonObject
     }
     
     /**
+     * Columns added by migrations after the first version of the table. fetch() reads all of
+     * them, so a missing one (module files updated without disabling/enabling the module)
+     * makes every file unreadable.
+     */
+    const MIGRATED_COLUMNS = array(
+        'ai_retries', 'source', 'file_hash', 'import_rule_label', 'calc_method',
+        'processing_token', 'processing_started', 'idempotency_key',
+    );
+
+    /**
+     * Columns of llx_upinvoice_files the code needs but the database does not have yet
+     *
+     * @param DoliDB $db Database handler
+     * @return string[] Missing column names (empty if the schema is up to date)
+     */
+    public static function getMissingColumns($db)
+    {
+        global $conf;
+
+        if (isset($conf->cache['upinvoice_missing_columns'])) {
+            return $conf->cache['upinvoice_missing_columns'];
+        }
+        $existing = array();
+        $info = $db->DDLInfoTable(MAIN_DB_PREFIX.'upinvoice_files');
+        if (is_array($info)) {
+            foreach ($info as $col) {
+                $existing[] = strtolower(is_array($col) ? reset($col) : $col);
+            }
+        }
+        // If the table description is not readable, do not raise a false alarm
+        $missing = empty($existing) ? array() : array_values(array_diff(self::MIGRATED_COLUMNS, $existing));
+        $conf->cache['upinvoice_missing_columns'] = $missing;
+        return $missing;
+    }
+
+    /**
+     * Warning to show when the database schema is older than the module files
+     *
+     * @param DoliDB $db Database handler
+     * @return string HTML, empty if the schema is up to date
+     */
+    public static function getSchemaWarning($db)
+    {
+        global $langs;
+
+        $missing = self::getMissingColumns($db);
+        if (empty($missing)) {
+            return '';
+        }
+        $langs->load('upinvoice@upinvoice');
+        $link = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?search_keyword=upinvoice">'.$langs->trans('UpInvoiceSchemaOutdatedLink').'</a>';
+        return info_admin($langs->trans('UpInvoiceSchemaOutdated', implode(', ', $missing)).' '.$link, 0, 0, 'error');
+    }
+
+    /**
+     * Duration of a processing lease: after it, a file still flagged as processing is
+     * considered stuck and can be claimed again (UI "Retry", delete, cron).
+     *
+     * @return int Seconds
+     */
+    public static function getLeaseSeconds()
+    {
+        return max(60, getDolGlobalInt('UPINVOICE_STUCK_SECONDS', 180));
+    }
+
+    /**
+     * Whether a file flagged as processing has outlived its lease.
+     * Rows processed before the lease columns existed fall back on date_modification.
+     *
+     * @return bool
+     */
+    public function isProcessingStale()
+    {
+        if (empty($this->processing)) {
+            return false;
+        }
+        $start = !empty($this->processing_started) ? $this->processing_started : $this->date_modification;
+        return (dol_now() - (int) $start) > self::getLeaseSeconds();
+    }
+
+    /**
+     * Whether stored API data contains a usable invoice extraction (supplier name or lines)
+     *
+     * @param string|null $json api_json value
+     * @return bool
+     */
+    public static function hasInvoiceData($json)
+    {
+        $data = !empty($json) ? json_decode($json, true) : null;
+        return is_array($data) && (!empty($data['supplier']['name']) || !empty($data['lines']));
+    }
+
+    /**
+     * Atomically take the processing lease of this file. Shared by the web endpoint and the cron
+     * so that two workers (two tabs, two users, web + cron) never send the same file to the API.
+     *
+     * A file is claimable when it has no invoice yet and is pending, in error, or "processed"
+     * without usable data and without supplier; and when nobody holds a live lease on it.
+     * On success the object is reloaded (processing_token, idempotency_key...).
+     *
+     * @return string 'claimed', 'in_progress', 'not_processable' or 'error'
+     */
+    public function claimForProcessing()
+    {
+        if ($this->fetch($this->id) <= 0) {
+            return 'error';
+        }
+        // A "processed" file is only retried when the API gave no usable data
+        if ($this->status == 1 && self::hasInvoiceData($this->api_json)) {
+            return 'not_processable';
+        }
+
+        $now = dol_now();
+        $token = bin2hex(random_bytes(16));
+        $newkey = 'upinv-'.bin2hex(random_bytes(24));
+        $staleLimit = $this->db->idate($now - self::getLeaseSeconds());
+
+        $sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET";
+        $sql .= " processing = 1,";
+        $sql .= " processing_token = '".$this->db->escape($token)."',";
+        $sql .= " processing_started = '".$this->db->idate($now)."',";
+        $sql .= " idempotency_key = COALESCE(idempotency_key, '".$this->db->escape($newkey)."')";
+        $sql .= " WHERE rowid = ".((int) $this->id);
+        $sql .= " AND fk_invoice IS NULL";
+        // For a "processed" file, also require that api_json is still the one checked above:
+        // another worker may have stored good data in between
+        $sql .= " AND (status IN (0, -1) OR (status = 1 AND fk_supplier IS NULL AND ";
+        $sql .= ($this->api_json === null ? "api_json IS NULL" : "api_json = '".$this->db->escape($this->api_json)."'")."))";
+        $sql .= " AND (processing = 0 OR COALESCE(processing_started, date_modification) < '".$staleLimit."')";
+
+        $resql = $this->db->query($sql);
+        if (!$resql) {
+            $this->error = "Error ".$this->db->lasterror();
+            return 'error';
+        }
+        if ($this->db->affected_rows($resql) == 0) {
+            // Lost the race or not eligible: reload to tell which
+            $this->fetch($this->id);
+            if ($this->processing == 1 && !$this->isProcessingStale()) {
+                return 'in_progress';
+            }
+            return 'not_processable';
+        }
+
+        $this->fetch($this->id);
+        if ($this->processing_token !== $token) {
+            return 'in_progress';
+        }
+        return 'claimed';
+    }
+
+    /**
+     * Store the outcome of a processing attempt and release the lease, only if the lease
+     * is still ours. A late result (lease expired and taken by another worker, or file
+     * deleted) is discarded. Never touches fk_supplier/fk_invoice, which the user may have
+     * set meanwhile.
+     *
+     * @param User                 $user   User
+     * @param string               $token  Lease token returned by claimForProcessing()
+     * @param array<string,mixed>  $fields Columns to set among api_json, status, import_step, import_error, ai_retries, idempotency_key
+     * @return int 1 if stored, 0 if the lease was lost (nothing written), -1 on SQL error
+     */
+    public function finishProcessing(User $user, $token, $fields)
+    {
+        $allowed = array('api_json', 'status', 'import_step', 'import_error', 'ai_retries', 'idempotency_key');
+
+        if (method_exists($this->db, 'ping')) {
+            $this->db->ping();
+        }
+
+        $now = dol_now();
+        $sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET";
+        foreach ($fields as $field => $value) {
+            if (!in_array($field, $allowed)) {
+                continue;
+            }
+            if ($value === null) {
+                $sql .= " ".$field." = NULL,";
+            } elseif (in_array($field, array('status', 'import_step', 'ai_retries'))) {
+                $sql .= " ".$field." = ".((int) $value).",";
+            } else {
+                $sql .= " ".$field." = '".$this->db->escape($value)."',";
+            }
+        }
+        $sql .= " processing = 0, processing_token = NULL,";
+        $sql .= " date_modification = '".$this->db->idate($now)."', fk_user_modif = ".((int) $user->id);
+        $sql .= " WHERE rowid = ".((int) $this->id)." AND processing_token = '".$this->db->escape($token)."'";
+
+        $resql = $this->db->query($sql);
+        if (!$resql) {
+            $this->error = "Error ".$this->db->lasterror();
+            return -1;
+        }
+        if ($this->db->affected_rows($resql) == 0) {
+            dol_syslog("UpInvoiceFiles::finishProcessing file id=".$this->id." lease lost, late result discarded", LOG_WARNING);
+            return 0;
+        }
+
+        foreach ($fields as $field => $value) {
+            if (in_array($field, $allowed)) {
+                $this->$field = $value;
+            }
+        }
+        $this->processing = 0;
+        $this->processing_token = null;
+        $this->date_modification = $now;
+        $this->fk_user_modif = $user->id;
+        return 1;
+    }
+
+    /**
      * Cron method: process pending files with the UpInvoice AI API.
      * Called by the scheduled job declared in modUpInvoice (label "UpInvoice AI queue processing").
      *
@@ -499,24 +731,17 @@ class UpInvoiceFiles extends CommonObject
         $savedentity = $conf->entity;
 
         foreach ($rows as $row) {
-            // Atomic claim so parallel cron runs never process the same file twice
-            $sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element." SET processing = 1";
-            $sql .= " WHERE rowid = ".((int) $row['rowid'])." AND processing = 0 AND status IN (0, -1)";
-            $resql = $this->db->query($sql);
-            if (!$resql || $this->db->affected_rows($resql) == 0) {
-                $nbskipped++;
-                continue;
-            }
-
+            // Atomic claim (same lease as the web endpoint) so cron runs and users never process the same file twice
             $file = new UpInvoiceFiles($this->db);
-            if ($file->fetch($row['rowid']) <= 0) {
+            $file->id = $row['rowid'];
+            if ($file->claimForProcessing() !== 'claimed') {
                 $nbskipped++;
                 continue;
             }
 
             // processWithApi() reads entity-dependent company constants ($conf->global->MAIN_INFO_*)
             $conf->entity = $row['entity'];
-            $result = $file->processWithApi($user);
+            $result = $file->processWithApi($user, $file->processing_token);
             $conf->entity = $savedentity;
 
             if ($result > 0) {
@@ -537,18 +762,34 @@ class UpInvoiceFiles extends CommonObject
     /**
      * Process file through UpInvoice API
      *
-     * @param User $user User that processes
+     * The caller should hold the processing lease (claimForProcessing()); without token the
+     * lease is claimed here. Results are written only while the lease is still ours.
+     *
+     * @param User   $user  User that processes
+     * @param string $token Lease token returned by claimForProcessing()
      * @return int <0 if KO, >0 if OK
      */
-    public function processWithApi(User $user)
+    public function processWithApi(User $user, $token = '')
     {
         global $conf, $langs;
         $langs->load("upinvoice@upinvoice");
-        
-        // Set processing flag
-        $this->processing = 1;
-        $this->update($user, 1);
-        
+
+        if (empty($token)) {
+            $claim = $this->claimForProcessing();
+            if ($claim !== 'claimed') {
+                $this->import_error = $langs->trans($claim == 'in_progress' ? 'FileAlreadyProcessing' : 'FileNotProcessable');
+                return -2;
+            }
+            $token = $this->processing_token;
+        }
+
+        // Key handling depends on how far the request went: once the API has answered 200 it has
+        // charged, so a later retry must be a new attempt (new key). Without an answer we keep the
+        // key, so a retry is replayed by the API without being charged again.
+        $rotateKey = false;
+        $countRetry = true;
+        $responseHeaders = array();
+
         try {
             // Check if file exists
             if (!file_exists($this->file_path)) {
@@ -569,12 +810,29 @@ class UpInvoiceFiles extends CommonObject
             curl_setopt($ch, CURLOPT_URL, $apiUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_POST, true);
-            
+
+            // The request must end before the lease expires, otherwise another worker could
+            // claim the file while this one is still waiting for the API
+            $lease = self::getLeaseSeconds();
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_TIMEOUT, $lease - min(30, intdiv($lease, 3)));
+
             // Set headers
-            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            $headers = array(
                 'Authorization: Bearer ' . $apiKey,
                 'Accept: application/json'
-            ));
+            );
+            if (!empty($this->idempotency_key)) {
+                $headers[] = 'Idempotency-Key: ' . $this->idempotency_key;
+            }
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $line) use (&$responseHeaders) {
+                $parts = explode(':', $line, 2);
+                if (count($parts) == 2) {
+                    $responseHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
+                }
+                return strlen($line);
+            });
             
             // Prepare file for upload
             $cFile = new CURLFile(
@@ -631,6 +889,25 @@ class UpInvoiceFiles extends CommonObject
             }
             
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+            if ($httpCode == 200) {
+                $rotateKey = true;
+                if (!empty($responseHeaders['idempotent-replayed']) && strtolower($responseHeaders['idempotent-replayed']) === 'true') {
+                    dol_syslog("UpInvoiceFiles::processWithApi file id=".$this->id." result replayed by the API for key ".$this->idempotency_key." (not charged again)", LOG_INFO);
+                }
+            }
+            if ($httpCode == 409) {
+                // The API is still processing the first request with this key: keep the key and
+                // do not count it as a failed attempt
+                $countRetry = false;
+                $retryAfter = !empty($responseHeaders['retry-after']) ? (int) $responseHeaders['retry-after'] : 30;
+                throw new Exception($langs->trans('UpInvoiceStillProcessing', $retryAfter));
+            }
+            if ($httpCode == 422 && !empty($this->idempotency_key)) {
+                // Key bound to another file content: start a new attempt on next retry
+                $rotateKey = true;
+                throw new Exception($langs->trans('UpInvoiceIdempotencyMismatch'));
+            }
 
             if($httpCode == 400){
                 // Si en $response hay un mensaje de error, lo mostramos
@@ -691,12 +968,9 @@ class UpInvoiceFiles extends CommonObject
             if (!$newHasInvoice) {
                 // If we already had good extracted data (re-processing), keep it intact
                 // instead of overwriting it with an empty response.
-                $oldData = !empty($this->api_json) ? json_decode($this->api_json, true) : null;
-                $oldHasInvoice = is_array($oldData) && (!empty($oldData['supplier']['name']) || !empty($oldData['lines']));
-                if ($oldHasInvoice) {
-                    $this->processing = 0;
-                    $this->update($user, 1);
-                    return 1;
+                if (self::hasInvoiceData($this->api_json)) {
+                    $result = $this->finishProcessing($user, $token, array('idempotency_key' => null));
+                    return $result > 0 ? 1 : -1;
                 }
                 // Keep the raw response in the log: these "success without data" replies
                 // are transient API-side failures and are impossible to diagnose otherwise
@@ -704,34 +978,39 @@ class UpInvoiceFiles extends CommonObject
                 throw new Exception($langs->trans('CouldNotExtractInvoiceData'));
             }
 
-            $this->api_json = json_encode($newData);
-
-            // Store API response in database
-            $this->status = 1; // Processed
-            $this->processing = 0; // No longer processing
-            $this->import_step = 2; // Next step: supplier validation
-            $this->import_error = '';
-
-            if (method_exists($this->db, 'ping')) {
-                $this->db->ping(); 
-            }
-            
-            $result = $this->update($user, 1);
+            // Store API response in database (status 1 = processed, step 2 = supplier validation)
+            $result = $this->finishProcessing($user, $token, array(
+                'api_json' => json_encode($newData),
+                'status' => 1,
+                'import_step' => 2,
+                'import_error' => '',
+                'idempotency_key' => null,
+            ));
             if ($result < 0) {
                 throw new Exception("Failed to update database record: " . $this->error);
             }
-            
-            return 1;
-            
-        } catch (Exception $e) {
-            // Update record with error
-            $this->status = -1; // Error
-            $this->processing = 0; // No longer processing
-            $this->import_error = $e->getMessage();
-            $this->ai_retries = (int) $this->ai_retries + 1; // Count the failed attempt (gates cron auto-retry)
-            $this->update($user, 1);
+            if ($result == 0) {
+                // Lease lost: another worker owns the file now, its result prevails
+                $this->import_error = $langs->trans('FileAlreadyProcessing');
+                return -2;
+            }
 
-            dol_syslog("UpInvoiceFiles::processWithApi file id=".$this->id." attempt ".$this->ai_retries." failed: ".$e->getMessage(), LOG_WARNING);
+            return 1;
+
+        } catch (Exception $e) {
+            // Update record with error (count the failed attempt, it gates cron auto-retry)
+            $fields = array(
+                'status' => -1,
+                'import_error' => $e->getMessage(),
+                'ai_retries' => (int) $this->ai_retries + ($countRetry ? 1 : 0),
+            );
+            if ($rotateKey) {
+                $fields['idempotency_key'] = null;
+            }
+            $result = $this->finishProcessing($user, $token, $fields);
+            $this->import_error = $e->getMessage();
+
+            dol_syslog("UpInvoiceFiles::processWithApi file id=".$this->id." attempt ".$this->ai_retries." failed".($result == 0 ? " (lease lost, not stored)" : "").": ".$e->getMessage(), LOG_WARNING);
 
             return -1;
         }

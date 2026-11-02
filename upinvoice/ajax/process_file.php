@@ -83,27 +83,31 @@ if ($result <= 0) {
     exit;
 }
 
-// Check if file is already being processed (but allow if it's stuck beyond the threshold)
-$stuckSeconds = getDolGlobalInt('UPINVOICE_STUCK_SECONDS', 180);
-if ($stuckSeconds < 30) {
-    $stuckSeconds = 30;
-}
-if ($upinvoicefiles->processing == 1) {
-    $timeSinceModification = time() - $upinvoicefiles->date_modification;
-    if ($timeSinceModification <= $stuckSeconds) {
-        // File is actively processing, not stuck
-        $result = array('status' => 'error', 'message' => $langs->trans('FileAlreadyProcessing'));
-        echo json_encode($result);
-        exit;
-    }
-    // If stuck for more than 100 seconds, allow retry by setting processing to 0
-    $upinvoicefiles->processing = 0;
-    $upinvoicefiles->status = 0; // Reset to pending
-    $upinvoicefiles->update($user);
+// Take the processing lease atomically: a second request for the same file (another tab,
+// another user, the cron) is refused instead of calling the API twice. A stuck file (lease
+// expired) can be claimed again.
+$claim = $upinvoicefiles->claimForProcessing();
+if ($claim !== 'claimed') {
+    $messages = array(
+        'in_progress' => 'FileAlreadyProcessing',
+        'not_processable' => 'FileNotProcessable',
+        'error' => 'ProcessingError',
+    );
+    $result = array(
+        'status' => 'error',
+        'code' => $claim,
+        'message' => $langs->trans($messages[$claim]),
+        'file_id' => $file_id
+    );
+    echo json_encode($result);
+    exit;
 }
 
+// The API call is bounded by the lease (see processWithApi()), leave PHP some margin over it
+@set_time_limit(UpInvoiceFiles::getLeaseSeconds() + 30);
+
 // Process the file
-$process_result = $upinvoicefiles->processWithApi($user);
+$process_result = $upinvoicefiles->processWithApi($user, $upinvoicefiles->processing_token);
 
 if ($process_result > 0) {
     // Success
@@ -117,11 +121,15 @@ if ($process_result > 0) {
     );
 } else {
     // Error
+    // -2: the lease was lost meanwhile, another worker owns the file and its result prevails
     $result = array(
         'status' => 'error',
         'message' => $upinvoicefiles->import_error ? $upinvoicefiles->import_error : $langs->trans('ProcessingError'),
         'file_id' => $file_id
     );
+    if ($process_result == -2) {
+        $result['code'] = 'in_progress';
+    }
 }
 
 echo json_encode($result);

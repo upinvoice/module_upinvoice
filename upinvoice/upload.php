@@ -88,6 +88,9 @@ if ($active_tab === 'emails' && !$showEmailsTab) {
 // Header
 llxHeader('', $langs->trans($page_name), $help_url, '', 0, 0, $morejs, $morecss);
 
+// Module files updated without disabling/enabling the module: new columns are missing
+print UpInvoiceFiles::getSchemaWarning($db);
+
 // Check if UpInvoice API key is configured
 $apiKey = getDolGlobalString('UPINVOICE_API_KEY');
 

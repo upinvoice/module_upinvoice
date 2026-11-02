@@ -89,12 +89,6 @@ if ($limit <= 0 || $limit > 100) {
     $limit = !empty($conf->liste_limit) ? (int) $conf->liste_limit : 25;
 }
 
-// Seconds after which a file flagged as "processing" is considered stuck (configurable)
-$stuckSeconds = getDolGlobalInt('UPINVOICE_STUCK_SECONDS', 180);
-if ($stuckSeconds < 30) {
-    $stuckSeconds = 30;
-}
-
 // Initialize objects
 $upinvoicefiles = new UpInvoiceFiles($db);
 
@@ -130,6 +124,14 @@ if ($fileType === 'pending') {
     $sql .= $sqlWhere;
     $sql .= " ORDER BY f.date_modification DESC"; // Order by modification date (when invoice was created)
     $sql .= $db->plimit($limit, ($page - 1) * $limit);
+}
+
+// Every fetch() fails while the migrations of an update are not applied: say why instead of an empty list
+$missingColumns = UpInvoiceFiles::getMissingColumns($db);
+if (!empty($missingColumns)) {
+    $result = array('status' => 'error', 'message' => $langs->trans('UpInvoiceSchemaOutdated', implode(', ', $missingColumns)));
+    echo json_encode($result);
+    exit;
 }
 
 $resql = $db->query($sql);
@@ -171,14 +173,8 @@ if (count($files) == 0) {
         
         // Files list
         foreach ($files as $file) {
-            // Check if file is stuck in processing state (processing == 1 but last modification was more than UPINVOICE_STUCK_SECONDS ago)
-            $isStuckProcessing = false;
-            if ($file->processing == 1) {
-                $timeSinceModification = time() - $file->date_modification;
-                if ($timeSinceModification > $stuckSeconds) {
-                    $isStuckProcessing = true;
-                }
-            }
+            // Stuck = flagged as processing but its lease (UPINVOICE_STUCK_SECONDS) has expired
+            $isStuckProcessing = $file->isProcessingStale();
 
             // Does the stored JSON actually contain usable invoice data? A file can be
             // flagged "Processed" with a response that carries no extraction (e.g. only

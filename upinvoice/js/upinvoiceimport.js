@@ -267,6 +267,18 @@ function processFile(fileId, callback) {
                     // then schedule a debounced sync with the real API value
                     upinvoiceUpdateCreditsOptimistic();
                     upinvoiceDebounceCreditsRefresh();
+                } else if (result.code === 'in_progress' || result.code === 'not_processable') {
+                    // Not an error of this file: another tab, user or the cron is processing it
+                    // (or already did). Keep the button disabled; the list refresh below shows
+                    // the real state from the server.
+                    $fileCard.attr('data-state', result.code === 'in_progress' ? 'processing' : 'processed');
+                    $status.html('<i class="fas fa-info-circle"></i> ' + result.message);
+                    showNotification('<i class="fas fa-info-circle"></i> ' + result.message, 'info');
+                    $progressContainer.remove();
+
+                    // Release the processing flag and go on with the next file
+                    isProcessingActive = false;
+                    findAndProcessNextFile();
                 } else {
                     // Update status with error
                     $status.html('<span class="badge badge-error">' + upinvoiceimport_langs.Error + '</span>');

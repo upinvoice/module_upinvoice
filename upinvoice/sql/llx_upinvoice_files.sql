@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS llx_upinvoice_files (
   fk_invoice INT,
   status TINYINT DEFAULT 0, -- 0:pending, 1:processed, -1:error
   processing TINYINT DEFAULT 0, -- 0:not processing, 1:processing
+  processing_token VARCHAR(32) DEFAULT NULL, -- owner of the current processing lease
+  processing_started DATETIME DEFAULT NULL, -- start of the current processing lease
+  idempotency_key VARCHAR(64) DEFAULT NULL, -- Idempotency-Key of the current API attempt
   import_error TEXT,
   ai_retries SMALLINT NOT NULL DEFAULT 0, -- failed AI extraction attempts (gates cron auto-retry)
   source VARCHAR(32) DEFAULT NULL, -- NULL or 'web': manual upload; 'email': queued via EmailCollector
