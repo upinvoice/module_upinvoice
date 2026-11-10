@@ -91,44 +91,93 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 // --- START: Product Reference Lookup ---
-// Process lines and search for product matches by reference
+// Links each line with a Dolibarr product by the reference shown on the invoice.
+// Same rule as the web (invoice.blade.php, findProductByRefs):
+// - references are tried in order (product_refs if there are several, otherwise product_ref)
+// - candidates are products whose ref, ref_ext or label contains the pieces of the reference
+// - the best field wins: ref, then ref_ext, then label; inside a field, an exact match beats a key match
+// - if several candidates share that best level, the one whose type matches the AI line type is kept;
+//   if more than one remains, that reference does not link (the user chooses the product by hand)
 if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
     // Comparison key for references: letters and digits only, unaccented and uppercase, so that
     // "SWITCH'GSMIP4G12V" (invoice) matches "SWITCH_GSMIP4G12V" (Product::create replaces spaces,
     // quotes, '/', ',' etc. with '_'), as is done with supplier VAT numbers
     $productRefKey = function ($ref) {
-        return strtoupper(preg_replace('/[^\p{L}\p{N}]/u', '', dol_string_unaccent((string) $ref)));
+        return mb_strtoupper(preg_replace('/[^\p{L}\p{N}]/u', '', dol_string_unaccent((string) $ref)));
     };
-    // Product whose reference matches one of $refs (in order): exact match first, then by key
-    $findProductByRefs = function ($refs) use ($db, $productRefKey) {
+    // Level of a product for a reference (lower is better), or null if it does not match
+    $matchLevel = function ($obj, $ref, $key) use ($productRefKey) {
+        foreach (array('ref', 'ref_ext', 'label') as $i => $field) {
+            $value = (string) $obj->$field;
+            if ($value === '') {
+                continue;
+            }
+            if ($value === $ref) {
+                return $i * 2;
+            }
+            if ($productRefKey($value) === $key) {
+                return $i * 2 + 1;
+            }
+        }
+        return null;
+    };
+    // Product linked to the first reference of $refs that has an unambiguous match, or null
+    $findProductByRefs = function ($refs, $lineType) use ($db, $productRefKey, $matchLevel) {
+        $pageSize = 20;
+        $maxPages = 5;
         foreach ($refs as $ref) {
             $ref = trim((string) $ref);
+            $key = $productRefKey($ref);
             $tokens = preg_split('/[^\p{L}\p{N}]+/u', $ref, -1, PREG_SPLIT_NO_EMPTY);
-            if (empty($tokens)) {
+            if ($key === '' || empty($tokens)) {
                 continue;
             }
-            $sql = "SELECT p.rowid, p.ref, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type";
+            $like = implode('%', array_map(array($db, 'escape'), $tokens));
+            $sql = "SELECT p.rowid, p.ref, p.ref_ext, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type";
             $sql .= " FROM ".MAIN_DB_PREFIX."product as p";
-            $sql .= " WHERE p.ref LIKE '%".implode('%', array_map(array($db, 'escape'), $tokens))."%'";
+            $sql .= " WHERE (p.ref LIKE '%".$like."%' OR p.ref_ext LIKE '%".$like."%' OR p.label LIKE '%".$like."%')";
             $sql .= " AND p.entity IN (".getEntity('product').")";
-            $sql .= " ORDER BY (p.ref = '".$db->escape($ref)."') DESC, p.rowid ASC";
-            $sql .= $db->plimit(50);
+            $sql .= " ORDER BY p.rowid ASC";
 
-            $resql = $db->query($sql);
-            if (!$resql) {
-                continue;
-            }
-            $match = null;
-            while ($obj = $db->fetch_object($resql)) {
-                if ($obj->ref === $ref || $productRefKey($obj->ref) === $productRefKey($ref)) {
-                    $match = $obj;
+            $candidates = array();
+            for ($page = 0; $page < $maxPages; $page++) {
+                $resql = $db->query($sql.$db->plimit($pageSize, $page * $pageSize));
+                if (!$resql) {
+                    break;
+                }
+                $rows = 0;
+                while ($obj = $db->fetch_object($resql)) {
+                    $rows++;
+                    $level = $matchLevel($obj, $ref, $key);
+                    if ($level !== null) {
+                        $candidates[] = array('level' => $level, 'obj' => $obj);
+                    }
+                }
+                $db->free($resql);
+                if ($rows < $pageSize) {
                     break;
                 }
             }
-            $db->free($resql);
-            if ($match) {
-                return $match;
+            if (empty($candidates)) {
+                continue;
             }
+
+            $bestLevel = min(array_column($candidates, 'level'));
+            $pool = array_values(array_filter($candidates, function ($c) use ($bestLevel) {
+                return $c['level'] === $bestLevel;
+            }));
+            if (count($pool) > 1 && $lineType !== null) {
+                $sameType = array_values(array_filter($pool, function ($c) use ($lineType) {
+                    return (int) $c['obj']->fk_product_type === $lineType;
+                }));
+                if (!empty($sameType)) {
+                    $pool = $sameType;
+                }
+            }
+            if (count($pool) === 1) {
+                return $pool[0]['obj'];
+            }
+            // Ambiguous for this reference: try the next one
         }
         return null;
     };
@@ -137,26 +186,16 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
         // Check if the line has a product reference
         if (!empty($line['product_ref'])) {
             // product_refs only comes when the invoice shows several references for the line
-            $product_obj = $findProductByRefs(!empty($line['product_refs']) && is_array($line['product_refs']) ? $line['product_refs'] : array($line['product_ref']));
+            $refs = !empty($line['product_refs']) && is_array($line['product_refs']) ? $line['product_refs'] : array($line['product_ref']);
+            $lineType = isset($line['product_type']) && $line['product_type'] !== '' ? (int) $line['product_type'] : null;
+            $product_obj = $findProductByRefs($refs, $lineType);
             if ($product_obj) {
-                // Check if product type matches (if provided in JSON)
-                $product_type_matches = true;
-                // Note: We use fk_product_type from the found product for consistency later
-                // If the JSON provides a type, we check if it matches the database product type.
-                if (isset($line['product_type']) && $product_obj->fk_product_type != $line['product_type']) {
-                    $product_type_matches = false;
-                    // Optional: Add a warning if types don't match?
-                }
-
-                if ($product_type_matches) {
-                    // Save the product ID and label in the line data
-                    $invoice_data['lines'][$key]['fk_product'] = $product_obj->rowid;
-                    $invoice_data['lines'][$key]['product_label'] = $product_obj->label;
-                    // Ensure the line type reflects the matched product's type
-                    $invoice_data['lines'][$key]['product_type'] = $product_obj->fk_product_type;
-                    // Keep the reference that matched (the line may carry several)
-                    $invoice_data['lines'][$key]['product_ref'] = $product_obj->ref;
-                }
+                // Save the product ID and label in the line data; the line takes the product's type
+                $invoice_data['lines'][$key]['fk_product'] = $product_obj->rowid;
+                $invoice_data['lines'][$key]['product_label'] = $product_obj->label;
+                $invoice_data['lines'][$key]['product_type'] = $product_obj->fk_product_type;
+                // Keep the reference that matched (the line may carry several)
+                $invoice_data['lines'][$key]['product_ref'] = $product_obj->ref;
             }
         }
     }

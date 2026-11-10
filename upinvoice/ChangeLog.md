@@ -1,3 +1,9 @@
+1.4.6 (2026-11-10)
+- Product matching by reference looks at the product ref, its external ref (ref_ext) and its label, in that order of priority (exact match before normalized match). Before, only the ref was searched
+- Reading the candidates goes page by page (20 per page, up to 100), so a correct product is not lost when many products share part of the reference
+- When several products tie on the best match, the one with the same type (product/service) as the invoice line is chosen; if the tie remains, the line is not linked and the product is chosen by hand. A single match is linked whatever its type (the line takes the product's type)
+- Normalized reference comparison uses multibyte uppercase
+
 1.4.5 (2026-11-02)
 - An invoice is never sent twice to the UpInvoice API: processing now takes an atomic lease with an owner token, shared by the web page and the cron, so two tabs, two users or the cron cannot process the same file at the same time. A file already processed with data, or with a supplier or invoice already set, is refused by the server
 - A late result (lease expired and taken by another worker, or file deleted) is discarded instead of overwriting the file, and processing never overwrites the supplier or invoice chosen meanwhile
