@@ -1,3 +1,7 @@
+1.4.7 (2026-11-10)
+- Product matching by reference first tries the supplier code (ref_fourn: the code this supplier uses for the product), only among the purchase prices of the supplier of the invoice. Then it tries the internal reference, ref_ext and label, as before
+- References are tried in order in each pass: a reference that gives several products is skipped, and the line is not linked if no reference gives a single product (the user chooses it by hand)
+
 1.4.6 (2026-11-10)
 - Product matching by reference looks at the product ref, its external ref (ref_ext) and its label, in that order of priority (exact match before normalized match). Before, only the ref was searched
 - Reading the candidates goes page by page (20 per page, up to 100), so a correct product is not lost when many products share part of the reference

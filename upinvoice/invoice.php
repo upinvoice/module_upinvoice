@@ -93,91 +93,140 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 // --- START: Product Reference Lookup ---
 // Links each line with a Dolibarr product by the reference shown on the invoice.
 // Same rule as the web (invoice.blade.php, findProductByRefs):
-// - references are tried in order (product_refs if there are several, otherwise product_ref)
-// - candidates are products whose ref, ref_ext or label contains the pieces of the reference
-// - the best field wins: ref, then ref_ext, then label; inside a field, an exact match beats a key match
-// - if several candidates share that best level, the one whose type matches the AI line type is kept;
-//   if more than one remains, that reference does not link (the user chooses the product by hand)
+// 1. Supplier codes first: the reference is compared with ref_fourn (the code this supplier uses
+//    for the product), only for the supplier of the invoice. References are tried in order.
+// 2. Then internal references: ref > ref_ext > label (inside a field, exact match before key match).
+// In each pass, references are tried in order, and the first one with a unique product wins.
+// If a reference gives several products, it is skipped (next reference); if none is unique,
+// the line is not linked and the user chooses the product by hand.
+// Within a level, several candidates are broken by the type the AI gave the line (product/service);
+// a single candidate is linked whatever its type.
 if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
+    // Supplier of the invoice (set by invoice.php; empty means no supplier codes are searched)
+    $lookupSupplierId = (int) ($lookupSupplierId ?? ($upinvoicefiles->fk_supplier ?? 0));
+
     // Comparison key for references: letters and digits only, unaccented and uppercase, so that
     // "SWITCH'GSMIP4G12V" (invoice) matches "SWITCH_GSMIP4G12V" (Product::create replaces spaces,
     // quotes, '/', ',' etc. with '_'), as is done with supplier VAT numbers
     $productRefKey = function ($ref) {
         return mb_strtoupper(preg_replace('/[^\p{L}\p{N}]/u', '', dol_string_unaccent((string) $ref)));
     };
-    // Level of a product for a reference (lower is better), or null if it does not match
-    $matchLevel = function ($obj, $ref, $key) use ($productRefKey) {
-        foreach (array('ref', 'ref_ext', 'label') as $i => $field) {
-            $value = (string) $obj->$field;
-            if ($value === '') {
-                continue;
-            }
-            if ($value === $ref) {
-                return $i * 2;
-            }
-            if ($productRefKey($value) === $key) {
-                return $i * 2 + 1;
-            }
-        }
-        return null;
+    // Tokens of a reference (pieces of letters and digits), used in the LIKE searches
+    $likeOf = function ($db, $ref) {
+        $tokens = preg_split('/[^\p{L}\p{N}]+/u', $ref, -1, PREG_SPLIT_NO_EMPTY);
+        return empty($tokens) ? '' : implode('%', array_map(array($db, 'escape'), $tokens));
     };
-    // Product linked to the first reference of $refs that has an unambiguous match, or null
-    $findProductByRefs = function ($refs, $lineType) use ($db, $productRefKey, $matchLevel) {
+    // Reads up to 5 pages of 20 rows; keeps one candidate per product (its best level)
+    $collect = function ($db, $sql, $levelOf) {
         $pageSize = 20;
         $maxPages = 5;
+        $found = array();
+        for ($page = 0; $page < $maxPages; $page++) {
+            $resql = $db->query($sql.$db->plimit($pageSize, $page * $pageSize));
+            if (!$resql) {
+                break;
+            }
+            $rows = 0;
+            while ($obj = $db->fetch_object($resql)) {
+                $rows++;
+                $level = $levelOf($obj);
+                if ($level !== null && (!isset($found[$obj->rowid]) || $level < $found[$obj->rowid]['level'])) {
+                    $found[$obj->rowid] = array('level' => $level, 'obj' => $obj);
+                }
+            }
+            $db->free($resql);
+            if ($rows < $pageSize) {
+                break;
+            }
+        }
+        return array_values($found);
+    };
+    // The product of the candidates at the best level, if there is exactly one (type breaks ties), or null
+    $pickUnique = function ($candidates, $lineType) {
+        if (empty($candidates)) {
+            return null;
+        }
+        $bestLevel = min(array_column($candidates, 'level'));
+        $pool = array_values(array_filter($candidates, function ($c) use ($bestLevel) {
+            return $c['level'] === $bestLevel;
+        }));
+        if (count($pool) > 1 && $lineType !== null) {
+            $sameType = array_values(array_filter($pool, function ($c) use ($lineType) {
+                return (int) $c['obj']->fk_product_type === $lineType;
+            }));
+            if (!empty($sameType)) {
+                $pool = $sameType;
+            }
+        }
+        return count($pool) === 1 ? $pool[0]['obj'] : null;
+    };
+
+    // Pass 1 candidates: products whose supplier code (ref_fourn) for the invoice supplier matches the reference
+    $supplierCandidates = function ($db, $ref, $key) use ($productRefKey, $likeOf, $collect, $lookupSupplierId) {
+        $like = $likeOf($db, $ref);
+        if ($lookupSupplierId <= 0 || $like === '') {
+            return array();
+        }
+        $sql = "SELECT p.rowid, p.ref, p.ref_ext, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type, pfp.ref_fourn";
+        $sql .= " FROM ".MAIN_DB_PREFIX."product_fournisseur_price as pfp";
+        $sql .= " INNER JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = pfp.fk_product";
+        $sql .= " WHERE pfp.fk_soc = ".$lookupSupplierId." AND pfp.ref_fourn LIKE '%".$like."%'";
+        $sql .= " AND p.entity IN (".getEntity('product').")";
+        $sql .= " ORDER BY p.rowid ASC";
+        return $collect($db, $sql, function ($obj) use ($ref, $key, $productRefKey) {
+            $value = (string) $obj->ref_fourn;
+            if ($value === '') {
+                return null;
+            }
+            if ($value === $ref) {
+                return 0;
+            }
+            return $productRefKey($value) === $key ? 1 : null;
+        });
+    };
+
+    // Pass 2 candidates: products whose ref, ref_ext or label matches the reference
+    $internalCandidates = function ($db, $ref, $key) use ($productRefKey, $likeOf, $collect) {
+        $like = $likeOf($db, $ref);
+        if ($like === '') {
+            return array();
+        }
+        $sql = "SELECT p.rowid, p.ref, p.ref_ext, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type";
+        $sql .= " FROM ".MAIN_DB_PREFIX."product as p";
+        $sql .= " WHERE (p.ref LIKE '%".$like."%' OR p.ref_ext LIKE '%".$like."%' OR p.label LIKE '%".$like."%')";
+        $sql .= " AND p.entity IN (".getEntity('product').")";
+        $sql .= " ORDER BY p.rowid ASC";
+        return $collect($db, $sql, function ($obj) use ($ref, $key, $productRefKey) {
+            // Field priority: ref (0), ref_ext (1), label (2); exact match (0) before key match (1)
+            foreach (array('ref', 'ref_ext', 'label') as $i => $field) {
+                $value = (string) $obj->$field;
+                if ($value === '') {
+                    continue;
+                }
+                if ($value === $ref) {
+                    return $i * 2;
+                }
+                if ($productRefKey($value) === $key) {
+                    return $i * 2 + 1;
+                }
+            }
+            return null;
+        });
+    };
+
+    // Product for the first reference (in order) that gives a unique product in this pass, or null
+    $linkPass = function ($db, $refs, $lineType, $candidatesOf) use ($productRefKey) {
         foreach ($refs as $ref) {
             $ref = trim((string) $ref);
             $key = $productRefKey($ref);
-            $tokens = preg_split('/[^\p{L}\p{N}]+/u', $ref, -1, PREG_SPLIT_NO_EMPTY);
-            if ($key === '' || empty($tokens)) {
+            if ($key === '') {
                 continue;
             }
-            $like = implode('%', array_map(array($db, 'escape'), $tokens));
-            $sql = "SELECT p.rowid, p.ref, p.ref_ext, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type";
-            $sql .= " FROM ".MAIN_DB_PREFIX."product as p";
-            $sql .= " WHERE (p.ref LIKE '%".$like."%' OR p.ref_ext LIKE '%".$like."%' OR p.label LIKE '%".$like."%')";
-            $sql .= " AND p.entity IN (".getEntity('product').")";
-            $sql .= " ORDER BY p.rowid ASC";
-
-            $candidates = array();
-            for ($page = 0; $page < $maxPages; $page++) {
-                $resql = $db->query($sql.$db->plimit($pageSize, $page * $pageSize));
-                if (!$resql) {
-                    break;
-                }
-                $rows = 0;
-                while ($obj = $db->fetch_object($resql)) {
-                    $rows++;
-                    $level = $matchLevel($obj, $ref, $key);
-                    if ($level !== null) {
-                        $candidates[] = array('level' => $level, 'obj' => $obj);
-                    }
-                }
-                $db->free($resql);
-                if ($rows < $pageSize) {
-                    break;
-                }
+            // $candidatesOf returns the unique product for this reference, or null (none or ambiguous)
+            $obj = $candidatesOf($db, $ref, $key);
+            if ($obj !== null) {
+                return $obj;
             }
-            if (empty($candidates)) {
-                continue;
-            }
-
-            $bestLevel = min(array_column($candidates, 'level'));
-            $pool = array_values(array_filter($candidates, function ($c) use ($bestLevel) {
-                return $c['level'] === $bestLevel;
-            }));
-            if (count($pool) > 1 && $lineType !== null) {
-                $sameType = array_values(array_filter($pool, function ($c) use ($lineType) {
-                    return (int) $c['obj']->fk_product_type === $lineType;
-                }));
-                if (!empty($sameType)) {
-                    $pool = $sameType;
-                }
-            }
-            if (count($pool) === 1) {
-                return $pool[0]['obj'];
-            }
-            // Ambiguous for this reference: try the next one
         }
         return null;
     };
@@ -188,7 +237,16 @@ if (!empty($invoice_data['lines']) && is_array($invoice_data['lines'])) {
             // product_refs only comes when the invoice shows several references for the line
             $refs = !empty($line['product_refs']) && is_array($line['product_refs']) ? $line['product_refs'] : array($line['product_ref']);
             $lineType = isset($line['product_type']) && $line['product_type'] !== '' ? (int) $line['product_type'] : null;
-            $product_obj = $findProductByRefs($refs, $lineType);
+
+            $product_obj = null;
+            foreach (array($supplierCandidates, $internalCandidates) as $candidatesOf) {
+                $product_obj = $linkPass($db, $refs, $lineType, function ($db, $ref, $key) use ($candidatesOf, $pickUnique, $lineType) {
+                    return $pickUnique($candidatesOf($db, $ref, $key), $lineType);
+                });
+                if ($product_obj) {
+                    break;
+                }
+            }
             if ($product_obj) {
                 // Save the product ID and label in the line data; the line takes the product's type
                 $invoice_data['lines'][$key]['fk_product'] = $product_obj->rowid;
