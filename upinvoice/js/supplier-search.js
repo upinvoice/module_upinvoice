@@ -99,7 +99,7 @@ $(document).ready(function() {
                     
                     if (result.status === 'success') {
                         // Redirigir a la página de validación de facturas
-                        window.location.href = upinvoiceimport_root + '/invoice.php?file_id=' + $('#file_id').val();
+                        window.location.href = upinvoiceimport_root + (typeof upinvoiceimport_review_file !== 'undefined' ? upinvoiceimport_review_file : '/invoice.php') + '?file_id=' + $('#file_id').val();
                     } else {
                         alert(result.message || upinvoiceimport_langs.ErrorConfirmingSupplier);
                     }

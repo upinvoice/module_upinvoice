@@ -76,6 +76,12 @@ if ($result <= 0) {
     exit;
 }
 
+// Orders have their own page
+if ($upinvoicefiles->isOrder()) {
+    header("Location: ".dol_buildpath('/upinvoice/order.php', 1)."?file_id=".$upinvoicefiles->id);
+    exit;
+}
+
 // Check if file has API JSON data
 if (empty($upinvoicefiles->api_json)) {
     setEventMessages($langs->trans("FileNotProcessed"), null, 'errors');

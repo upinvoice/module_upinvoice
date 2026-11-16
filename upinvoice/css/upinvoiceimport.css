@@ -30,6 +30,46 @@
     gap: 12px;
 }
 
+/* Document type tabs (Supplier invoices / Supplier orders / Customer orders), in the top bar */
+.upinv-doctype-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.upinv-doctype-tab {
+    padding: 7px 14px;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    background: #fff;
+    color: #444 !important;
+    text-decoration: none !important;
+    white-space: nowrap;
+}
+.upinv-doctype-tab:hover {
+    background: #f2f5fb;
+}
+.upinv-doctype-tab.active {
+    background: #263c5c;
+    border-color: #263c5c;
+    color: #fff !important;
+    font-weight: bold;
+}
+.upinv-doctype-count {
+    display: inline-block;
+    min-width: 18px;
+    padding: 0 5px;
+    margin-left: 4px;
+    border-radius: 9px;
+    background: #e05353;
+    color: #fff;
+    font-size: 0.85em;
+    text-align: center;
+}
+.upinv-doctype-hint {
+    font-weight: bold;
+    color: #263c5c;
+}
+
 /* Message notifications */
 .upinvoiceimport-messages {
     margin-bottom: 20px;

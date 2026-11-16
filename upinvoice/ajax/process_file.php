@@ -53,6 +53,7 @@ if (!$res) {
 $langs->loadLangs(array('upinvoice@upinvoice'));
 
 require_once '../class/upinvoicefiles.class.php';
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
 
 // Control access
 if (!$user->rights->facture->lire) {
@@ -73,6 +74,7 @@ $token = GETPOST('token', 'alpha');
 $file_id = GETPOST('file_id', 'int');
 
 // Initialize objects
+upinvoice_ajax_schema_guard($db);
 $upinvoicefiles = new UpInvoiceFiles($db);
 
 // Check if file exists

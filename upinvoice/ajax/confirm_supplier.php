@@ -53,6 +53,7 @@ if (!$res) {
 $langs->loadLangs(array('upinvoice@upinvoice'));
 
 require_once '../class/upinvoicefiles.class.php';
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
 
 // Control access
 if (!$user->rights->facture->lire) {
@@ -82,6 +83,7 @@ if (empty($fileId) || empty($supplierId)) {
 }
 
 // Initialize objects
+upinvoice_ajax_schema_guard($db);
 $upinvoicefiles = new UpInvoiceFiles($db);
 
 // Fetch file record
@@ -108,8 +110,9 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 // Update JSON data to include supplier ID
-if (is_array($invoice_data) && isset($invoice_data['supplier'])) {
-    $invoice_data['supplier']['id'] = $supplierId;
+$tpKey = UpInvoiceFiles::thirdpartyKey($invoice_data);
+if (is_array($invoice_data) && isset($invoice_data[$tpKey])) {
+    $invoice_data[$tpKey]['id'] = $supplierId;
     $upinvoicefiles->api_json = json_encode($invoice_data);
 }
 

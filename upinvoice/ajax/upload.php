@@ -55,6 +55,7 @@ $langs->loadLangs(array('upinvoice@upinvoice'));
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once '../class/upinvoicefiles.class.php';
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
 
 // Control access
 if (!$user->rights->facture->lire) {
@@ -72,6 +73,10 @@ if (empty($_POST['token']) || empty($_FILES['userfile'])) {
 
 
 $token = GETPOST('token', 'alpha');
+
+upinvoice_ajax_schema_guard($db);
+// Type of document of the tab where the files were dropped
+$docType = upinvoice_requested_doc_type($user);
 
 // Define directory
 $upload_dir = DOL_DATA_ROOT . '/upinvoice/temp';
@@ -157,6 +162,7 @@ if (isset($_FILES['userfile']) && is_array($_FILES['userfile']['name'])) {
             $upinvoicefiles->file_size = $fileSize;
             $upinvoicefiles->file_type = $fileType;
             $upinvoicefiles->import_step = 1;
+            $upinvoicefiles->doc_type = $docType;
             $upinvoicefiles->status = 0; // Pending
             $upinvoicefiles->processing = 0; // Not processing
             

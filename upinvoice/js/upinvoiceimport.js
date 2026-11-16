@@ -40,6 +40,24 @@ function upinvoiceAddCreditsLink(links) {
 }
 
 /**
+ * Hide the document type tabs the UpInvoice API does not announce (an older API only
+ * processes supplier invoices). The active tab is kept so the page never loses its content.
+ */
+function upinvApplyApiDocTypes(resp) {
+    var features = resp && ((resp.data && resp.data.features) || resp.features);
+    var types = features && features.document_types;
+    if (!Array.isArray(types)) {
+        return;
+    }
+    $('.upinv-doctype-tab').each(function() {
+        var $tab = $(this);
+        if (!$tab.hasClass('active') && types.indexOf($tab.data('doc-type')) === -1) {
+            $tab.hide();
+        }
+    });
+}
+
+/**
  * Load (or refresh) the credits bar from the API.
  * Pass force=true to bypass the PHP session cache (used on manual refresh).
  */
@@ -55,6 +73,7 @@ function upinvoiceLoadCreditsBar(force) {
         success: function(resp) {
             var $bar = $('#upinvoice-credits-bar');
             if (!$bar.length) return;
+            upinvApplyApiDocTypes(resp);
             $('#upinvoice-credits-loading').hide();
             var $content = $('#upinvoice-credits-content').show();
 
@@ -766,6 +785,7 @@ function loadFilesList(silent) {
         data: {
             token: upinvoiceimport_token,
             file_type: upinvoiceimport_active_tab, // 'pending' or 'finished'
+            doc_type: (typeof upinvoiceimport_doc_type !== 'undefined') ? upinvoiceimport_doc_type : 'supplier_invoice',
             page: (upinvoiceimport_active_tab === 'finished') ? upinvFinishedPage : 1
         },
         success: function(response) {

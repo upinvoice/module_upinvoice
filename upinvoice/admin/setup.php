@@ -265,6 +265,42 @@ print '</div>';
 
 print '<br>';
 
+// Document types: supplier invoices are always on; orders are enabled here. A toggle is only
+// operable when the Dolibarr module of that document is enabled (otherwise: link to enable it)
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td colspan="3">' . $langs->trans("UpInvoiceDocTypesSection") . '</td>';
+print '</tr>';
+print '<tr class="oddeven">';
+print '<td>' . $langs->trans("UpInvoiceDocSupplierInvoices") . '</td>';
+print '<td>' . img_picto($langs->trans("Enabled"), 'switch_on') . '</td>';
+print '<td><span class="opacitymedium">' . $langs->trans("UpInvoiceDocSupplierInvoicesHelp") . '</span></td>';
+print '</tr>';
+$docTypeSetup = array(
+    // doc_type => array(module search keyword for admin/modules.php)
+    UpInvoiceFiles::DOC_SUPPLIER_ORDER => 'fournisseur',
+);
+$docTypeConstants = upinvoice_doc_type_constants();
+foreach ($docTypeSetup as $docType => $moduleKeyword) {
+    print '<tr class="oddeven">';
+    print '<td>' . $langs->trans(upinvoice_doc_type_label_key($docType)) . '</td>';
+    if (upinvoice_doc_type_module_enabled($docType)) {
+        print '<td>' . ajax_constantonoff($docTypeConstants[$docType], array(), $conf->entity) . '</td>';
+        print '<td>' . $langs->trans(upinvoice_doc_type_label_key($docType) . 'Help') . '</td>';
+    } else {
+        print '<td><span class="opacitymedium">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</span></td>';
+        print '<td><span class="warning">' . upinvoiceTransWithLink(
+            upinvoice_doc_type_label_key($docType) . 'ModuleDisabled',
+            '<a href="' . DOL_URL_ROOT . '/admin/modules.php?search_keyword=' . urlencode($moduleKeyword) . '">' . $langs->transnoentitiesnoconv("Modules") . '</a>'
+        ) . '</span></td>';
+    }
+    print '</tr>';
+}
+print '</table>';
+
+print '<br>';
+
 // Email intake & automatic AI processing (toggles use ajax_constantonoff — no form needed)
 print '<table class="noborder centpercent">';
 

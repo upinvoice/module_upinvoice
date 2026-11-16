@@ -123,6 +123,18 @@ class UpInvoiceFiles extends CommonObject
     public $calc_method;
 
     /**
+     * Type of document. fk_supplier holds its third party (supplier or customer) and fk_invoice
+     * the Dolibarr object created from it (supplier invoice, supplier order or customer order).
+     * @var string One of DOC_TYPES
+     */
+    public $doc_type = self::DOC_SUPPLIER_INVOICE;
+
+    const DOC_SUPPLIER_INVOICE = 'supplier_invoice';
+    const DOC_SUPPLIER_ORDER = 'supplier_order';
+    const DOC_CUSTOMER_ORDER = 'customer_order';
+    const DOC_TYPES = array(self::DOC_SUPPLIER_INVOICE, self::DOC_SUPPLIER_ORDER, self::DOC_CUSTOMER_ORDER);
+
+    /**
      * @var string|null Owner of the current processing lease (random token set by claimForProcessing())
      */
     public $processing_token;
@@ -242,7 +254,7 @@ class UpInvoiceFiles extends CommonObject
         $this->fk_user_creat = $user->id;
         
         $sql = "INSERT INTO " . MAIN_DB_PREFIX . $this->table_element . " (";
-        $sql .= "file_path, original_filename, file_size, file_type, date_creation, fk_user_creat, import_step, status, processing, entity, source, file_hash, import_rule_label, calc_method";
+        $sql .= "file_path, original_filename, file_size, file_type, date_creation, fk_user_creat, import_step, status, processing, entity, source, file_hash, import_rule_label, calc_method, doc_type";
         $sql .= ") VALUES (";
         $sql .= " '" . $this->db->escape($this->file_path) . "',";
         $sql .= " '" . $this->db->escape($this->original_filename) . "',";
@@ -257,7 +269,8 @@ class UpInvoiceFiles extends CommonObject
         $sql .= " " . (!empty($this->source) ? "'".$this->db->escape($this->source)."'" : "NULL") . ",";
         $sql .= " " . (!empty($this->file_hash) ? "'".$this->db->escape($this->file_hash)."'" : "NULL") . ",";
         $sql .= " " . (!empty($this->import_rule_label) ? "'".$this->db->escape($this->import_rule_label)."'" : "NULL") . ",";
-        $sql .= " " . (!empty($this->calc_method) ? (int) $this->calc_method : "NULL");
+        $sql .= " " . (!empty($this->calc_method) ? (int) $this->calc_method : "NULL") . ",";
+        $sql .= " '" . $this->db->escape(self::isValidDocType($this->doc_type) ? $this->doc_type : self::DOC_SUPPLIER_INVOICE) . "'";
         $sql .= ")";
         
         $resql = $this->db->query($sql);
@@ -293,7 +306,7 @@ class UpInvoiceFiles extends CommonObject
     {
         $sql = "SELECT rowid, file_path, original_filename, file_size, file_type, api_json,";
         $sql .= " date_creation, fk_user_creat, date_modification, fk_user_modif,";
-        $sql .= " import_step, fk_supplier, fk_invoice, status, processing, import_error, ai_retries, source, file_hash, import_rule_label, calc_method,";
+        $sql .= " import_step, fk_supplier, fk_invoice, status, processing, import_error, ai_retries, source, file_hash, import_rule_label, calc_method, doc_type,";
         $sql .= " processing_token, processing_started, idempotency_key";
         $sql .= " FROM " . MAIN_DB_PREFIX . $this->table_element;
         $sql .= " WHERE rowid = " . (int) $id;
@@ -324,6 +337,7 @@ class UpInvoiceFiles extends CommonObject
                 $this->file_hash = isset($obj->file_hash) ? $obj->file_hash : null;
                 $this->import_rule_label = isset($obj->import_rule_label) ? $obj->import_rule_label : null;
                 $this->calc_method = isset($obj->calc_method) ? $obj->calc_method : null;
+                $this->doc_type = self::isValidDocType($obj->doc_type) ? $obj->doc_type : self::DOC_SUPPLIER_INVOICE;
                 $this->processing_token = $obj->processing_token;
                 $this->processing_started = $obj->processing_started ? $this->db->jdate($obj->processing_started) : null;
                 $this->idempotency_key = $obj->idempotency_key;
@@ -369,7 +383,8 @@ class UpInvoiceFiles extends CommonObject
         $sql .= " processing = " . (int) $this->processing . ",";
         $sql .= " import_error = " . (isset($this->import_error) ? "'".$this->db->escape($this->import_error)."'" : "null") . ",";
         $sql .= " ai_retries = " . (int) $this->ai_retries . ",";
-        $sql .= " calc_method = " . (!empty($this->calc_method) ? (int) $this->calc_method : "null");
+        $sql .= " calc_method = " . (!empty($this->calc_method) ? (int) $this->calc_method : "null") . ",";
+        $sql .= " doc_type = '" . $this->db->escape(self::isValidDocType($this->doc_type) ? $this->doc_type : self::DOC_SUPPLIER_INVOICE) . "'";
         $sql .= " WHERE rowid = " . (int) $this->id;
         
         $resql = $this->db->query($sql);
@@ -462,6 +477,36 @@ class UpInvoiceFiles extends CommonObject
         return $files;
     }
     
+    /**
+     * @param string $docType Document type
+     * @return bool           True if it is one of DOC_TYPES
+     */
+    public static function isValidDocType($docType)
+    {
+        return in_array((string) $docType, self::DOC_TYPES, true);
+    }
+
+    /**
+     * True for the order types (supplier_order, customer_order)
+     *
+     * @return bool
+     */
+    public function isOrder()
+    {
+        return $this->doc_type === self::DOC_SUPPLIER_ORDER || $this->doc_type === self::DOC_CUSTOMER_ORDER;
+    }
+
+    /**
+     * Third party block of the API data: 'thirdparty' for orders, 'supplier' for invoices
+     *
+     * @param array $data Decoded api_json
+     * @return string     Key of the third party block in $data
+     */
+    public static function thirdpartyKey($data)
+    {
+        return (is_array($data) && isset($data['thirdparty']) && is_array($data['thirdparty'])) ? 'thirdparty' : 'supplier';
+    }
+
     /** @var string[]|null Result of getMissingColumns() for this request */
     private static $missingColumnsCache = null;
 
@@ -472,7 +517,7 @@ class UpInvoiceFiles extends CommonObject
      */
     const MIGRATED_COLUMNS = array(
         'ai_retries', 'source', 'file_hash', 'import_rule_label', 'calc_method',
-        'processing_token', 'processing_started', 'idempotency_key',
+        'processing_token', 'processing_started', 'idempotency_key', 'doc_type',
     );
 
     /**
@@ -554,7 +599,7 @@ class UpInvoiceFiles extends CommonObject
     public static function hasInvoiceData($json)
     {
         $data = !empty($json) ? json_decode($json, true) : null;
-        return is_array($data) && (!empty($data['supplier']['name']) || !empty($data['lines']));
+        return is_array($data) && (!empty($data['supplier']['name']) || !empty($data['thirdparty']['name']) || !empty($data['lines']));
     }
 
     /**
@@ -800,6 +845,11 @@ class UpInvoiceFiles extends CommonObject
             
             // API URL and Key from config
             $apiUrl = getDolGlobalString('UPINVOICE_API_URL', 'https://upinvoice.eu/api/process-invoice');
+            // Orders go to /api/process-document with their document_type; invoices keep the
+            // original call to /api/process-invoice, exactly as before
+            if ($this->isOrder()) {
+                $apiUrl = str_replace('/api/process-invoice', '/api/process-document', $apiUrl);
+            }
             $apiKey = !empty($conf->global->UPINVOICE_API_KEY) ? $conf->global->UPINVOICE_API_KEY : '';
             
             $linkToSetup = dol_buildpath('/upinvoice/admin/setup.php', 1);
@@ -878,6 +928,9 @@ class UpInvoiceFiles extends CommonObject
                 'company_name' => $conf->global->MAIN_INFO_SOCIETE_NOM,
                 'company_tax_id' => $companyTaxId,
             );
+            if ($this->isOrder()) {
+                $post['document_type'] = $this->doc_type;
+            }
             
             curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
             
@@ -965,7 +1018,7 @@ class UpInvoiceFiles extends CommonObject
             // breaks "Siguiente paso"/"Validar factura". So we only accept a response
             // that contains usable invoice data (a supplier name or at least one line).
             $newData = $jsonResponse['data'];
-            $newHasInvoice = !empty($newData['supplier']['name']) || !empty($newData['lines']);
+            $newHasInvoice = !empty($newData['supplier']['name']) || !empty($newData['thirdparty']['name']) || !empty($newData['lines']);
             if (!$newHasInvoice) {
                 // If we already had good extracted data (re-processing), keep it intact
                 // instead of overwriting it with an empty response.

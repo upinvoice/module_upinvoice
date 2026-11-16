@@ -25,5 +25,6 @@ CREATE TABLE IF NOT EXISTS llx_upinvoice_files (
   import_rule_label VARCHAR(255) DEFAULT NULL, -- snapshot of the auto-import rule that queued an email file
   file_hash VARCHAR(64) DEFAULT NULL, -- SHA-256 hex digest for content-based deduplication
   calc_method TINYINT DEFAULT NULL, -- VAT calculation method used to create the invoice (1=total of round, 2=round of total)
+  doc_type VARCHAR(32) NOT NULL DEFAULT 'supplier_invoice', -- supplier_invoice, supplier_order, customer_order
   tms TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;

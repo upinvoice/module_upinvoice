@@ -1,3 +1,12 @@
+1.5.0 (2026-11-16)
+- New: supplier orders. Enable "Supplier orders" in the module setup (it needs the Dolibarr supplier orders module) and a "Supplier orders" tab appears next to "Supplier invoices" on the upload page, with the credits bar on the same row (credits are shared by all document types). There is also an UpInvoice entry in the Commercial > Supplier orders menu
+- A supplier order PDF can be your own purchase order or the supplier's order confirmation: the supplier, its reference, the order date, the expected delivery date, notes and lines are read from it. When your company issued the document, its number is kept in the private note
+- The order is reviewed on a page like the invoice one (same product matching by supplier code, same lines table) and created as a draft or validated, with the PDF in its Documents tab. Receiving the goods and invoicing the order is done in Dolibarr as usual
+- Warnings before creating: the document does not look like an order (quotation, delivery note, invoice), the amounts are in another currency than Dolibarr's (no conversion), or the supplier already has an order with the same reference
+- If the extracted third party is your own company, it is never selected automatically
+- Supplier invoices work exactly as before
+- Update: disable and enable the module again after updating, to add the new column of llx_upinvoice_files (doc_type) and the new menu entry. Until then, the upload page shows a warning naming the missing column
+
 1.4.9 (2026-11-16)
 - Internal: product matching by reference moved to a class (UpInvoiceProductMatcher), and the lines table with its totals script to tpl/lines_form.tpl.php and js/upinvoice-lines.js, to share them with orders. No change in behaviour: same products linked and same page for invoices
 

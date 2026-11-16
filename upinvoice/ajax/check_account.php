@@ -45,6 +45,8 @@ if (!$res) {
 
 global $conf, $user, $langs;
 
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
+
 header('Content-Type: application/json');
 
 // Permission check: same requirement as reading supplier invoices
@@ -104,8 +106,16 @@ if ($curlErrno) {
     exit;
 }
 
+$json = ($httpCode === 200 || $httpCode === 403) ? json_decode($response, true) : null;
+// Document types this API can process (orders since API 2026-11). An API that answers
+// without "features" is older: only supplier invoices. Remembered for the upload page tabs.
+if (is_array($json) && in_array($httpCode, array(200, 403), true)) {
+    $features = isset($json['data']['features']) ? $json['data']['features'] : (isset($json['features']) ? $json['features'] : array());
+    $apiDocTypes = (!empty($features['document_types']) && is_array($features['document_types'])) ? array_values($features['document_types']) : array('supplier_invoice');
+    upinvoice_set_api_doc_types($apiDocTypes);
+}
+
 if ($httpCode === 200) {
-    $json = json_decode($response, true);
     if (json_last_error() !== JSON_ERROR_NONE || empty($json['success']) || empty($json['data'])) {
         $result = array('status' => 'error', 'code' => 'invalid_response');
     } else {
@@ -118,6 +128,9 @@ if ($httpCode === 200) {
     $result = array('status' => 'error', 'code' => 'no_plan');
     if (!empty($json['links']) && is_array($json['links'])) {
         $result['links'] = $json['links'];
+    }
+    if (isset($apiDocTypes)) {
+        $result['features'] = array('document_types' => $apiDocTypes);
     }
 } elseif ($httpCode === 429) {
     $result = array('status' => 'error', 'code' => 'rate_limit');

@@ -39,12 +39,13 @@ require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 require_once './class/upinvoicefiles.class.php';
 dol_include_once('/upinvoice/class/upinvoicemailbox.class.php');
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
 
 // Control access
 if (!$user->rights->facture->lire) accessforbidden();
 
 // Load translations
-$langs->loadLangs(array("upinvoice@upinvoice", "bills", "other"));
+$langs->loadLangs(array("upinvoice@upinvoice", "bills", "other", "orders", "companies"));
 
 // Define temp directory
 $upload_dir = DOL_DATA_ROOT . '/upinvoice/temp';
@@ -69,9 +70,31 @@ $morecss = array(
     '/upinvoice/css/upinvoiceimport.css.php'
 );
 
-// Detect if the Emails tab should be available
+// Document type of the page (tabs on top): supplier invoices unless another available type is asked
+$availableDocTypes = upinvoice_available_doc_types($user);
+$doc_type = GETPOST('doc_type', 'aZ09');
+if (!in_array($doc_type, $availableDocTypes, true)) {
+    $doc_type = UpInvoiceFiles::DOC_SUPPLIER_INVOICE;
+}
+$docTypeParam = ($doc_type === UpInvoiceFiles::DOC_SUPPLIER_INVOICE) ? '' : '&doc_type='.urlencode($doc_type);
+
+// Pending files per document type (badge of each tab)
+$pendingByDocType = array();
+if (count($availableDocTypes) > 1 && !UpInvoiceFiles::getMissingColumns($db)) {
+    $sqlcount = "SELECT doc_type, COUNT(*) as nb FROM ".MAIN_DB_PREFIX."upinvoice_files";
+    $sqlcount .= " WHERE entity = ".((int) $conf->entity)." AND (fk_invoice IS NULL OR fk_invoice = 0)";
+    $sqlcount .= " GROUP BY doc_type";
+    $rescount = $db->query($sqlcount);
+    if ($rescount) {
+        while ($objcount = $db->fetch_object($rescount)) {
+            $pendingByDocType[$objcount->doc_type] = (int) $objcount->nb;
+        }
+    }
+}
+
+// Detect if the Emails tab should be available (email import creates supplier invoices only)
 $showEmailsTab = false;
-if (getDolGlobalString('UPINVOICE_EMAILCOLLECTOR_ENABLED') && isModEnabled('emailcollector')) {
+if ($doc_type === UpInvoiceFiles::DOC_SUPPLIER_INVOICE && getDolGlobalString('UPINVOICE_EMAILCOLLECTOR_ENABLED') && isModEnabled('emailcollector')) {
     $collectorId = UpInvoiceMailbox::findCollectorId($db);
     if ($collectorId > 0) {
         $showEmailsTab = true;
@@ -97,6 +120,20 @@ $apiKey = getDolGlobalString('UPINVOICE_API_KEY');
 // Header bar: UpInvoice logo (left) + live credits/plan bar (right)
 print '<div class="upinv-topbar">';
 print '<a href="https://upinvoice.eu" target="_blank" rel="noopener"><img src="'.dol_buildpath('/upinvoice/img/upinvoice.png', 1).'" alt="UpInvoice" class="upinv-logo"></a>';
+// Document type tabs (only when more than one type is available); credits are shared by all of them
+if (count($availableDocTypes) > 1) {
+    print '<nav class="upinv-doctype-tabs">';
+    foreach ($availableDocTypes as $tabDocType) {
+        $tabUrl = dol_buildpath('/upinvoice/upload.php', 1).($tabDocType === UpInvoiceFiles::DOC_SUPPLIER_INVOICE ? '' : '?doc_type='.urlencode($tabDocType));
+        print '<a href="'.$tabUrl.'" class="upinv-doctype-tab'.($tabDocType === $doc_type ? ' active' : '').'" data-doc-type="'.dol_escape_htmltag($tabDocType).'">';
+        print $langs->trans(upinvoice_doc_type_label_key($tabDocType));
+        if (!empty($pendingByDocType[$tabDocType])) {
+            print ' <span class="upinv-doctype-count">'.$pendingByDocType[$tabDocType].'</span>';
+        }
+        print '</a>';
+    }
+    print '</nav>';
+}
 if (!empty($apiKey)) {
     print '<div id="upinvoice-credits-bar" class="upinv-credits">';
     print '<span class="fa fa-spinner fa-spin" id="upinvoice-credits-loading"></span>';
@@ -134,6 +171,9 @@ print '<div class="dropzone-content">';
 print '<i class="fas fa-upload fa-4x"></i>';
 print '<h3>' . $langs->trans('DragDropFiles') . '</h3>';
 print '<p>' . $langs->trans('OrClickToSelect') . '</p>';
+if (count($availableDocTypes) > 1) {
+    print '<p class="upinv-doctype-hint">' . $langs->trans('UpInvoiceUploadAs', $langs->transnoentitiesnoconv(upinvoice_doc_type_label_key($doc_type))) . '</p>';
+}
 print '<input type="file" id="fileupload" name="fileupload[]" multiple style="display:none;">';
 print '<button class="btn btn-primary" id="select-files">' . $langs->trans('SelectFiles') . '</button>';
 print '</div>';
@@ -147,15 +187,15 @@ print '</div>';
 print '<div class="tabs" data-role="tabs">';
 print '<ul class="tab-nav">';
 print '<li class="tab-element' . ($active_tab == 'pending' ? ' active' : '') . '">';
-print '<a href="'.dol_buildpath('/upinvoice/upload.php', 1).'?tab=pending" class="tab-link" data-target="pending-files">' . $langs->trans('PendingFiles') . ' <span class="upinvoice-count-badge" id="pending-count-badge"></span></a>';
+print '<a href="'.dol_buildpath('/upinvoice/upload.php', 1).'?tab=pending'.$docTypeParam.'" class="tab-link" data-target="pending-files">' . $langs->trans('PendingFiles') . ' <span class="upinvoice-count-badge" id="pending-count-badge"></span></a>';
 print '</li>';
 if ($showEmailsTab) {
     print '<li class="tab-element' . ($active_tab == 'emails' ? ' active' : '') . '">';
-    print '<a href="'.dol_buildpath('/upinvoice/upload.php', 1).'?tab=emails" class="tab-link" data-target="emails-tab">' . $langs->trans('EmailsTab') . '</a>';
+    print '<a href="'.dol_buildpath('/upinvoice/upload.php', 1).'?tab=emails'.$docTypeParam.'" class="tab-link" data-target="emails-tab">' . $langs->trans('EmailsTab') . '</a>';
     print '</li>';
 }
 print '<li class="tab-element' . ($active_tab == 'finished' ? ' active' : '') . '">';
-print '<a href="'.dol_buildpath('/upinvoice/upload.php', 1).'?tab=finished" class="tab-link" data-target="finished-files">' . $langs->trans('FinishedFiles') . '</a>';
+print '<a href="'.dol_buildpath('/upinvoice/upload.php', 1).'?tab=finished'.$docTypeParam.'" class="tab-link" data-target="finished-files">' . $langs->trans('FinishedFiles') . '</a>';
 print '</li>';
 print '</ul>';
 
@@ -319,7 +359,7 @@ if ($showEmailsTab) {
 // Finished Files tab
 print '<div id="finished-files" class="tab-content' . ($active_tab == 'finished' ? ' active' : '') . '">';
 print '<div class="upinvoiceimport-files-container">';
-print '<h3>' . $langs->trans('ProcessedInvoices') . '</h3>';
+print '<h3>' . $langs->trans($doc_type === UpInvoiceFiles::DOC_SUPPLIER_INVOICE ? 'ProcessedInvoices' : 'UpInvoiceProcessedOrders') . '</h3>';
 
 // Tabla de Dolibarr para archivos finalizados - Estructura modificada según los requisitos
 print '<table class="noborder centpercent">';
@@ -328,9 +368,9 @@ print '<th>' . $langs->trans("FileName") . '</th>';
 print '<th class="right">' . $langs->trans("Size") . '</th>';
 print '<th class="center">' . $langs->trans("UploadDate") . '</th>';
 print '<th class="center">' . $langs->trans("CompletionDate") . '</th>';
-print '<th class="center">' . $langs->trans("InvoiceDate") . '</th>';
+print '<th class="center">' . $langs->trans($doc_type === UpInvoiceFiles::DOC_SUPPLIER_INVOICE ? "InvoiceDate" : "OrderDate") . '</th>';
 print '<th class="right">' . $langs->trans("TotalTTC") . '</th>';
-print '<th>' . $langs->trans("Supplier") . '</th>';
+print '<th>' . $langs->trans($doc_type === UpInvoiceFiles::DOC_CUSTOMER_ORDER ? "Customer" : "Supplier") . '</th>';
 print '<th class="center">' . $langs->trans("Actions") . '</th>';
 print '</tr>';
 
@@ -356,6 +396,7 @@ print '</div>'; // Close container
     var upinvoiceimport_root = '<?php echo dirname($_SERVER['PHP_SELF']); ?>';
     var upinvoiceimport_token = '<?php echo newToken(); ?>';
     var upinvoiceimport_active_tab = '<?php echo $active_tab; ?>';
+    var upinvoiceimport_doc_type = '<?php echo dol_escape_js($doc_type); ?>';
     var upinvoiceimport_langs = {
         'ConfirmDeleteFile': '<?php echo html_entity_decode($langs->trans("ConfirmDeleteFile")); ?>',
         'ErrorProcessingResponse': '<?php echo html_entity_decode($langs->trans("ErrorProcessingResponse")); ?>',
@@ -700,7 +741,8 @@ $(document).ready(function() {
                     data: {
                         token: '<?php echo newToken(); ?>',
                         filename: file.name,
-                        filesize: file.size
+                        filesize: file.size,
+                        doc_type: upinvoiceimport_doc_type
                     },
                     success: function(response) {
                         checkCount++;
@@ -711,7 +753,8 @@ $(document).ready(function() {
                                 if (result.isDuplicate) {
                                     duplicateCount++;
                                     // Update preview to show duplicate
-                                    updatePreviewToDuplicate(index, '<?php echo $langs->trans('FileAlreadyUploaded'); ?>');
+                                    // Uploaded before in another document type tab: the message says which one
+                                    updatePreviewToDuplicate(index, result.otherDocType ? result.message : '<?php echo dol_escape_js($langs->trans('FileAlreadyUploaded')); ?>');
                                 } else {
                                     nonDuplicateFiles.push({file: file, index: index});
                                 }
@@ -760,6 +803,7 @@ $(document).ready(function() {
         }
         
         formData.append('token', '<?php echo newToken(); ?>');
+        formData.append('doc_type', upinvoiceimport_doc_type);
         
         $.ajax({
             url: '<?php echo dol_buildpath('/upinvoice/ajax/upload.php', 1); ?>',

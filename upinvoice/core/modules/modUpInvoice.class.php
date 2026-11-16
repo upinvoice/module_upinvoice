@@ -35,7 +35,7 @@ class modUpInvoice extends DolibarrModules
         $this->descriptionlong = "This module allows to upload, validate and register supplier invoices in a three steps process";
         $this->editor_name = "UpInvoice.eu";
         $this->editor_url = "https://upinvoice.eu";
-        $this->version = '1.4.9';
+        $this->version = '1.5.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';
 
@@ -92,6 +92,15 @@ class modUpInvoice extends DolibarrModules
                 'chaine',
                 '10485760',
                 'Maximum size in bytes for an email attachment to be imported (default 10 MB)',
+                0,
+                'current',
+                0
+            ),
+            5 => array(
+                'UPINVOICE_SUPPLIER_ORDERS_ENABLED',
+                'chaine',
+                '0',
+                'Import supplier orders (purchase orders) from PDF',
                 0,
                 'current',
                 0
@@ -154,6 +163,24 @@ class modUpInvoice extends DolibarrModules
             'position' => 100,
             'enabled' => '$conf->upinvoice->enabled',
             'perms' => '1',
+            'target' => '',
+            'user' => 0
+        );
+        $r++;
+
+        // Supplier orders: entry under Commercial > Supplier orders (when enabled in the module setup)
+        $this->menu[$r] = array(
+            'fk_menu' => 'fk_mainmenu=commercial,fk_leftmenu=orders_suppliers',
+            'type' => 'left',
+            'titre' => 'UpInvoice',
+            'prefix' => img_picto('', 'fa-cloud-upload-alt', 'class="fa-fw pictofixedwidth"'),
+            'mainmenu' => 'commercial',
+            'leftmenu' => 'upinvoice_supplier_orders',
+            'url' => '/upinvoice/upload.php?doc_type=supplier_order',
+            'langs' => 'upinvoice@upinvoice',
+            'position' => 450,
+            'enabled' => 'isModEnabled("upinvoice") && isModEnabled("supplier_order") && getDolGlobalInt("UPINVOICE_SUPPLIER_ORDERS_ENABLED")',
+            'perms' => '$user->hasRight("fournisseur", "commande", "creer") || $user->hasRight("supplier_order", "creer")',
             'target' => '',
             'user' => 0
         );

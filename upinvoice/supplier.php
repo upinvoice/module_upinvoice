@@ -102,7 +102,11 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 }
 
 // Get supplier data from JSON
-$supplier_data = isset($invoice_data['supplier']) ? $invoice_data['supplier'] : array();
+// Third party block: 'thirdparty' for orders, 'supplier' for invoices; next page by document type
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
+$tpKey = UpInvoiceFiles::thirdpartyKey($invoice_data);
+$reviewPage = upinvoice_doc_type_review_page($upinvoicefiles->doc_type);
+$supplier_data = isset($invoice_data[$tpKey]) ? $invoice_data[$tpKey] : array();
 if (empty($supplier_data) || empty($supplier_data['name'])) {
     setEventMessages($langs->trans("NoSupplierDataInJSON"), null, 'errors');
     header("Location: ".dol_buildpath('/upinvoice/upload.php', 1));
@@ -118,8 +122,8 @@ $searchResults = array();
 if ($action == 'confirm_supplier' && !empty($supplierId)) {
     // Update JSON data to include supplier ID
     $invoice_data = json_decode($upinvoicefiles->api_json, true);
-    if (is_array($invoice_data) && isset($invoice_data['supplier'])) {
-        $invoice_data['supplier']['id'] = $supplierId;
+    if (is_array($invoice_data) && isset($invoice_data[$tpKey])) {
+        $invoice_data[$tpKey]['id'] = $supplierId;
         $upinvoicefiles->api_json = json_encode($invoice_data);
     }
     
@@ -130,7 +134,7 @@ if ($action == 'confirm_supplier' && !empty($supplierId)) {
     
     if ($result > 0) {
         // Redirect to invoice validation page
-        header("Location: ".dol_buildpath('/upinvoice/invoice.php', 1)."?file_id=".$upinvoicefiles->id);
+        header("Location: ".dol_buildpath($reviewPage, 1)."?file_id=".$upinvoicefiles->id);
         exit;
     } else {
         setEventMessages($langs->trans("ErrorUpdatingFile"), null, 'errors');
@@ -156,8 +160,8 @@ if ($action == 'confirm_supplier' && !empty($supplierId)) {
     if ($result > 0) {
         // Update JSON data to include supplier ID
         $invoice_data = json_decode($upinvoicefiles->api_json, true);
-        if (is_array($invoice_data) && isset($invoice_data['supplier'])) {
-            $invoice_data['supplier']['id'] = $result;
+        if (is_array($invoice_data) && isset($invoice_data[$tpKey])) {
+            $invoice_data[$tpKey]['id'] = $result;
             $upinvoicefiles->api_json = json_encode($invoice_data);
         }
         
@@ -168,7 +172,7 @@ if ($action == 'confirm_supplier' && !empty($supplierId)) {
         
         if ($updateResult > 0) {
             // Redirect to invoice validation page
-            header("Location: ".dol_buildpath('/upinvoice/invoice.php', 1)."?file_id=".$upinvoicefiles->id);
+            header("Location: ".dol_buildpath($reviewPage, 1)."?file_id=".$upinvoicefiles->id);
             exit;
         } else {
             setEventMessages($langs->trans("ErrorUpdatingFile"), null, 'errors');
@@ -219,12 +223,15 @@ if (!empty($supplier_data['idprof1']) || !empty($supplier_data['tva_intra']) || 
     }
 }
 
+// The API says the extracted third party is our own company (orders): never pick it automatically
+$thirdpartyIsOwnCompany = !empty($invoice_data['warnings']) && is_array($invoice_data['warnings']) && in_array('thirdparty_matches_own_company', $invoice_data['warnings'], true);
+
 // Si un solo proveedor fue encontrado y no estamos manejando una acción del formulario, proceder al paso de factura
-if (empty($action) && $autoSearchDone && count($searchResults) == 1 && $foundSupplier) {
+if (empty($action) && !$thirdpartyIsOwnCompany && $autoSearchDone && count($searchResults) == 1 && $foundSupplier) {
     // Update JSON data to include supplier ID
     $invoice_data = json_decode($upinvoicefiles->api_json, true);
-    if (is_array($invoice_data) && isset($invoice_data['supplier'])) {
-        $invoice_data['supplier']['id'] = $searchResults[0]->id;
+    if (is_array($invoice_data) && isset($invoice_data[$tpKey])) {
+        $invoice_data[$tpKey]['id'] = $searchResults[0]->id;
         $upinvoicefiles->api_json = json_encode($invoice_data);
     }
     
@@ -234,7 +241,7 @@ if (empty($action) && $autoSearchDone && count($searchResults) == 1 && $foundSup
     $upinvoicefiles->update($user);
     
     // Redirect to invoice validation page
-    header("Location: ".dol_buildpath('/upinvoice/invoice.php', 1)."?file_id=".$upinvoicefiles->id);
+    header("Location: ".dol_buildpath($reviewPage, 1)."?file_id=".$upinvoicefiles->id);
     exit;
 }
 
@@ -252,6 +259,9 @@ $conf->dol_hide_leftmenu = 1;
 llxHeader('', $langs->trans($page_name), $help_url, '', 0, 0, $morejs, $morecss);
 
 print load_fiche_titre($langs->trans($page_name), '', 'title_companies');
+if ($thirdpartyIsOwnCompany) {
+    print '<div class="warning"><i class="fas fa-exclamation-triangle"></i> '.$langs->trans('UpInvoiceThirdpartyIsOwnCompany').'</div>';
+}
 
 $previewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
 $isPdfDoc = (strpos((string) $upinvoicefiles->file_type, 'pdf') !== false);
@@ -474,6 +484,7 @@ print '</div>';
 ?>
 <script type="text/javascript">
     var upinvoiceimport_root = '<?php echo dirname($_SERVER['PHP_SELF']); ?>';
+    var upinvoiceimport_review_file = '<?php echo dol_escape_js('/'.basename($reviewPage)); ?>';
     var upinvoiceimport_token = '<?php echo newToken(); ?>';
     var upinvoiceimport_langs = {
         'Searching': '<?php echo $langs->trans("Searching"); ?>',
@@ -536,7 +547,7 @@ $(document).ready(function() {
                     
                     if (result.status === 'success') {
                         // Redirect to invoice validation page
-                        window.location.href = upinvoiceimport_root + '/invoice.php?file_id=' + $('#file_id').val();
+                        window.location.href = upinvoiceimport_root + upinvoiceimport_review_file + '?file_id=' + $('#file_id').val();
                     } else {
                         alert(result.message || upinvoiceimport_langs.ErrorConfirmingSupplier);
                     }

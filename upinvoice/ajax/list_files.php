@@ -73,6 +73,17 @@ if (!isset($_GET['token'])) {
 
 $token = GETPOST('token', 'alpha');
 
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
+// Document type of the tab (supplier invoices unless another available type is asked)
+$docType = upinvoice_requested_doc_type($user);
+$isOrderType = ($docType !== UpInvoiceFiles::DOC_SUPPLIER_INVOICE);
+if ($docType === UpInvoiceFiles::DOC_SUPPLIER_ORDER) {
+    require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.commande.class.php';
+} elseif ($docType === UpInvoiceFiles::DOC_CUSTOMER_ORDER) {
+    require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+}
+$docTypeSql = " AND f.doc_type = '" . $db->escape($docType) . "'";
+
 // Get the file type requested (pending or finished)
 $fileType = GETPOST('file_type', 'alpha');
 if (!in_array($fileType, array('pending', 'finished'))) {
@@ -100,11 +111,13 @@ if ($fileType === 'pending') {
     // Pending files: No fk_invoice yet
     $sql .= " WHERE f.entity = " . $conf->entity;
     $sql .= " AND (f.fk_invoice IS NULL OR f.fk_invoice = 0)";
+    $sql .= $docTypeSql;
     $sql .= " ORDER BY f.date_creation DESC";
 } else {
     // Finished files: Have fk_invoice - Join with invoice and supplier tables for additional data
     $sqlWhere = " WHERE f.entity = " . $conf->entity;
     $sqlWhere .= " AND f.fk_invoice IS NOT NULL AND f.fk_invoice > 0";
+    $sqlWhere .= $docTypeSql;
 
     // Total count for pagination (before applying LIMIT)
     $totalFinished = 0;
@@ -119,8 +132,6 @@ if ($fileType === 'pending') {
         $page = $totalPages; // Clamp (e.g. after deleting the last row of the last page)
     }
 
-    $sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "facture_fourn as ff ON f.fk_invoice = ff.rowid";
-    $sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "societe as s ON f.fk_supplier = s.rowid";
     $sql .= $sqlWhere;
     $sql .= " ORDER BY f.date_modification DESC"; // Order by modification date (when invoice was created)
     $sql .= $db->plimit($limit, ($page - 1) * $limit);
@@ -272,7 +283,7 @@ if (count($files) == 0) {
             // Rendered inside the footer row (left), in line with the action buttons (right).
             $nextAction = '';
             if (!empty($file->fk_supplier) && empty($file->fk_invoice)) {
-                $nextAction = $langs->trans('NextActionInvoice');
+                $nextAction = $langs->trans($isOrderType ? 'NextActionOrder' : 'NextActionInvoice');
             } elseif ($cardState === 'processed' && $file->import_step > 1 && empty($file->fk_supplier)) {
                 $nextAction = $langs->trans('NextActionSupplier');
             } elseif ($cardState === 'pending' || $cardState === 'stuck') {
@@ -317,8 +328,8 @@ if (count($files) == 0) {
                 if ($fileType === 'pending') {
                     // Si tenemos un fk_supplier pero no un fk_invoice, mostrar "Validar factura"
                     if (!empty($file->fk_supplier) && empty($file->fk_invoice)) {
-                        $html .= '<a href="' . dol_buildpath('/upinvoice/invoice.php', 1) . '?file_id=' . $file->id . '" class="btn btn-success btn-sm">';
-                        $html .= '<i class="fas fa-check"></i> ' . $langs->trans('ValidateInvoice');
+                        $html .= '<a href="' . dol_buildpath(upinvoice_doc_type_review_page($file->doc_type), 1) . '?file_id=' . $file->id . '" class="btn btn-success btn-sm">';
+                        $html .= '<i class="fas fa-check"></i> ' . $langs->trans($isOrderType ? 'UpInvoiceReviewOrder' : 'ValidateInvoice');
                         $html .= '</a>';
                     }
                     // Otros casos según el estado
@@ -386,7 +397,7 @@ if (count($files) == 0) {
             } else {
                 $html .= '<i class="fas fa-file" style="margin-right: 5px;"></i>';
             }
-            $html .= '<a href="' . DOL_URL_ROOT . '/fourn/facture/card.php?facid=' . $file->fk_invoice . '" class="file-thumbnail-name" data-file-id="' . $file->id . '" data-file-name="' . dol_escape_htmltag($file->original_filename) . '" ';
+            $html .= '<a href="' . upinvoice_object_card_url($file->doc_type, $file->fk_invoice) . '" class="file-thumbnail-name" data-file-id="' . $file->id . '" data-file-name="' . dol_escape_htmltag($file->original_filename) . '" ';
             $html .= 'data-file-type="' . dol_escape_htmltag($file->file_type) . '" data-file-path="' . dol_buildpath('/viewimage.php', 1) . '?modulepart=upinvoice&file=temp/' . urlencode(basename($file->file_path)) . '&cache=0">';
             $html .= dol_escape_htmltag($file->original_filename);
             $html .= '</a>';
@@ -414,9 +425,16 @@ if (count($files) == 0) {
             $hasAmountDifference = false;
             
             if (!empty($file->fk_invoice)) {
-                $invoice = new FactureFournisseur($db);
+                // Dolibarr object created from the file: supplier invoice, supplier order or customer order
+                if ($file->doc_type === UpInvoiceFiles::DOC_SUPPLIER_ORDER) {
+                    $invoice = new CommandeFournisseur($db);
+                } elseif ($file->doc_type === UpInvoiceFiles::DOC_CUSTOMER_ORDER) {
+                    $invoice = new Commande($db);
+                } else {
+                    $invoice = new FactureFournisseur($db);
+                }
                 if ($invoice->fetch($file->fk_invoice) > 0) {
-                    $invoiceDate = $invoice->date;
+                    $invoiceDate = $isOrderType ? (!empty($invoice->date_commande) ? $invoice->date_commande : $invoice->date) : $invoice->date;
                     $totalAmount = $invoice->total_ttc;
                     
                     // Get the API extracted amount from JSON
@@ -452,7 +470,8 @@ if (count($files) == 0) {
             $html .= '<td class="supplier-on-table">';
             if (!empty($file->fk_supplier)) {
                 $supplier = new Fournisseur($db);
-                $html .= '<a href="' . DOL_URL_ROOT . '/fourn/card.php?socid=' . $file->fk_supplier . '" target="_blank">';
+                $thirdpartyCard = ($file->doc_type === UpInvoiceFiles::DOC_CUSTOMER_ORDER) ? '/comm/card.php?socid=' : '/fourn/card.php?socid=';
+                $html .= '<a href="' . DOL_URL_ROOT . $thirdpartyCard . $file->fk_supplier . '" target="_blank">';
                 if ($supplier->fetch($file->fk_supplier) > 0) {
                     $html .= $supplier->name;
                 } else {
@@ -468,7 +487,7 @@ if (count($files) == 0) {
             $html .= '<td class="center nowrap">';
             // View invoice button
             if (!empty($file->fk_invoice)) {
-                $html .= '<a href="' . DOL_URL_ROOT . '/fourn/facture/card.php?facid=' . $file->fk_invoice . '" class="btn btn-info btn-sm" target="_blank" title="' . $langs->trans('ViewInvoice') . '">';
+                $html .= '<a href="' . upinvoice_object_card_url($file->doc_type, $file->fk_invoice) . '" class="btn btn-info btn-sm" target="_blank" title="' . $langs->trans($isOrderType ? 'UpInvoiceViewOrder' : 'ViewInvoice') . '">';
                 $html .= '<i class="fas fa-link" style="color:#fff"></i>';
                 $html .= '</a> ';
             }

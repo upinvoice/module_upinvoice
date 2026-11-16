@@ -50,6 +50,7 @@ if (!$res) {
 $langs->loadLangs(array('upinvoice@upinvoice'));
 
 require_once '../class/upinvoicefiles.class.php';
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
 
 // Control access
 if (!$user->rights->facture->lire) {
@@ -71,8 +72,11 @@ $token = GETPOST('token', 'alpha');
 $filename = UpInvoiceFiles::normalizeFilename(GETPOST('filename', 'alpha'));
 $filesize = GETPOST('filesize', 'int');
 
-// Check for duplicate file
-$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "upinvoice_files";
+upinvoice_ajax_schema_guard($db);
+$docType = upinvoice_requested_doc_type($user);
+
+// Check for duplicate file (any document type: the same PDF is rarely both an order and an invoice)
+$sql = "SELECT rowid, doc_type FROM " . MAIN_DB_PREFIX . "upinvoice_files";
 $sql .= " WHERE entity = " . $conf->entity;
 $sql .= " AND original_filename = '" . $db->escape($filename) . "'";
 $sql .= " AND file_size = " . intval($filesize);
@@ -86,11 +90,17 @@ if (!$resql) {
 
 $isDuplicate = false;
 $duplicateFileId = 0;
+$message = '';
 
 if ($db->num_rows($resql) > 0) {
     $obj = $db->fetch_object($resql);
     $isDuplicate = true;
     $duplicateFileId = $obj->rowid;
+    $message = $langs->trans('DuplicateFileDetected');
+    if ($obj->doc_type !== $docType) {
+        // Uploaded before in another tab: say where it is
+        $message = $langs->trans('UpInvoiceDuplicateOtherDocType', $langs->transnoentitiesnoconv(upinvoice_doc_type_label_key($obj->doc_type)));
+    }
 }
 
 // Return result
@@ -98,7 +108,8 @@ $result = array(
     'status' => 'success',
     'isDuplicate' => $isDuplicate,
     'duplicateFileId' => $duplicateFileId,
-    'message' => $isDuplicate ? $langs->trans('DuplicateFileDetected') : ''
+    'message' => $message,
+    'otherDocType' => $isDuplicate && $obj->doc_type !== $docType
 );
 
 echo json_encode($result);
