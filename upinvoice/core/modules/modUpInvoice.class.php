@@ -35,7 +35,7 @@ class modUpInvoice extends DolibarrModules
         $this->descriptionlong = "This module allows to upload, validate and register supplier invoices in a three steps process";
         $this->editor_name = "UpInvoice.eu";
         $this->editor_url = "https://upinvoice.eu";
-        $this->version = '1.4.7';
+        $this->version = '1.4.8';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';
 
@@ -44,7 +44,7 @@ class modUpInvoice extends DolibarrModules
         $this->requiredby = array();
         $this->conflictwith = array();
         $this->phpmin = array(7, 0);
-        $this->need_dolibarr_version = array(11, 0);
+        $this->need_dolibarr_version = array(16, 0); // isModEnabled() exists since 16
         $this->langfiles = array("upinvoice@upinvoice");
 
         // Constants (name, type, value, note, visible, entity, deleteonunactive).

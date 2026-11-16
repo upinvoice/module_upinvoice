@@ -462,6 +462,9 @@ class UpInvoiceFiles extends CommonObject
         return $files;
     }
     
+    /** @var string[]|null Result of getMissingColumns() for this request */
+    private static $missingColumnsCache = null;
+
     /**
      * Columns added by migrations after the first version of the table. fetch() reads all of
      * them, so a missing one (module files updated without disabling/enabling the module)
@@ -480,10 +483,9 @@ class UpInvoiceFiles extends CommonObject
      */
     public static function getMissingColumns($db)
     {
-        global $conf;
-
-        if (isset($conf->cache['upinvoice_missing_columns'])) {
-            return $conf->cache['upinvoice_missing_columns'];
+        // Cached per request in a static: $conf->cache does not exist before Dolibarr 18
+        if (self::$missingColumnsCache !== null) {
+            return self::$missingColumnsCache;
         }
         $existing = array();
         $info = $db->DDLInfoTable(MAIN_DB_PREFIX.'upinvoice_files');
@@ -494,7 +496,7 @@ class UpInvoiceFiles extends CommonObject
         }
         // If the table description is not readable, do not raise a false alarm
         $missing = empty($existing) ? array() : array_values(array_diff(self::MIGRATED_COLUMNS, $existing));
-        $conf->cache['upinvoice_missing_columns'] = $missing;
+        self::$missingColumnsCache = $missing;
         return $missing;
     }
 
@@ -853,13 +855,12 @@ class UpInvoiceFiles extends CommonObject
             //Definitmos $company_tax_id... $conf->global->MAIN_INFO_TVAINTRA si existe quitando las 2 primeras letras o $conf->global->MAIN_INFO_SIREN si existe o $conf->global->MAIN_INFO_SIRET si existe o $conf->global->MAIN_INFO_APE si existe. Si no mostramos un error para que el usuario rellene el campo de la empresa
             $companyTaxId = '';
             if (!empty($conf->global->MAIN_INFO_TVAINTRA)) {
-                // Remove first 2 characters si son letras...
-                if (preg_match('/^[A-Z]{2}/', $conf->global->MAIN_INFO_TVAINTRA)) {
-                    $companyTaxId = substr($conf->global->MAIN_INFO_TVAINTRA, 2); // Remove first 2 characters
-                } else if (preg_match('/^[a-z]{2}/', $conf->global->MAIN_INFO_TVAINTRA)) {
-                    $companyTaxId = substr($conf->global->MAIN_INFO_TVAINTRA, 2); // Remove first 2 characters
-                } {
-                    $companyTaxId = $conf->global->MAIN_INFO_TVAINTRA; // Use as is
+                // Quitar el prefijo de país (2 letras) si lo tiene
+                $vatIntra = trim($conf->global->MAIN_INFO_TVAINTRA);
+                if (preg_match('/^[A-Za-z]{2}/', $vatIntra)) {
+                    $companyTaxId = trim(substr($vatIntra, 2));
+                } else {
+                    $companyTaxId = $vatIntra;
                 }
             } elseif (!empty($conf->global->MAIN_INFO_SIREN)) {
                 $companyTaxId = $conf->global->MAIN_INFO_SIREN;
@@ -1423,7 +1424,12 @@ class UpInvoiceFiles extends CommonObject
             $error = 'write_failed:'.$dest_file;
             return -1;
         }
-        dolChmod($dest_file);
+        // dolChmod() exists since Dolibarr 18
+        if (function_exists('dolChmod')) {
+            dolChmod($dest_file);
+        } elseif (getDolGlobalString('MAIN_UMASK')) {
+            @chmod($dest_file, octdec(getDolGlobalString('MAIN_UMASK')));
+        }
 
         $savedEntity = $conf->entity;
         $conf->entity = $entity;

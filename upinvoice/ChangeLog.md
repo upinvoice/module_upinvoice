@@ -1,3 +1,8 @@
+1.4.8 (2026-11-16)
+- Fix: the intra-community VAT number typed or detected when creating a new supplier was not saved on the supplier
+- Fix: the company VAT number sent to the UpInvoice API always kept its country prefix (e.g. "ESB12345678"); it is now sent without it ("B12345678"), as intended
+- Minimum Dolibarr version is now 16 (declared 11 before, but the module already needed functions added in Dolibarr 16). The code no longer relies on dolChmod() or $conf->cache, which are missing in Dolibarr 16 and 17
+
 1.4.7 (2026-11-10)
 - Product matching by reference first tries the supplier code (ref_fourn: the code this supplier uses for the product), only among the purchase prices of the supplier of the invoice. Then it tries the internal reference, ref_ext and label, as before
 - References are tried in order in each pass: a reference that gives several products is skipped, and the line is not linked if no reference gives a single product (the user chooses it by hand)

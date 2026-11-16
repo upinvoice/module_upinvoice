@@ -197,10 +197,14 @@ class UpInvoiceSupplier
             $supplier->code_fournisseur = 'auto';//$this->getNextSupplierCode();
             
             // Información fiscal
-            if (!empty($data['vat_number'])) {
-                $supplier->tva_intra = $data['vat_number'];
-                // Verificar si está sujeto a IVA
-                $supplier->tva_assuj = !empty($data['vat_used']) ? 1 : 0;
+            // supplier.php envía 'tva_intra'; 'vat_number' se mantiene por compatibilidad
+            $vatNumber = !empty($data['tva_intra']) ? $data['tva_intra'] : (!empty($data['vat_number']) ? $data['vat_number'] : '');
+            if ($vatNumber !== '') {
+                $supplier->tva_intra = $vatNumber;
+                // Sujeto a IVA: solo si se indica; si no, se deja el valor por defecto de Societe (1)
+                if (isset($data['vat_used'])) {
+                    $supplier->tva_assuj = !empty($data['vat_used']) ? 1 : 0;
+                }
             }
             
             // País y estado
