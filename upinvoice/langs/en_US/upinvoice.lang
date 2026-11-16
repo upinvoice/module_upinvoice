@@ -481,3 +481,25 @@ UpInvoiceOrderAttachFailed=The PDF could not be attached to the order
 UpInvoiceOrderCreated=Order %s created
 UpInvoiceOrderCreatedAndValidated=Order %s created and validated
 UpInvoiceDocumentDate=Document date: %s
+
+# Customer orders (1.6.0)
+UpInvoiceCustomer_SupplierValidation=Customer validation
+UpInvoiceCustomer_DetectedSupplierData=Detected customer data
+UpInvoiceCustomer_SupplierInformation=Customer information
+UpInvoiceCustomer_FoundSuppliers=Third parties found
+UpInvoiceCustomer_SelectThisSupplier=Select this customer
+UpInvoiceCustomer_CreateNewSupplier=Create new customer
+UpInvoiceCustomer_CreateSupplier=Create customer
+UpInvoiceCustomer_NoSupplierDataInJSON=No customer data found in the document
+UpInvoiceCustomer_ErrorCreatingSupplier=Error creating the customer
+UpInvoiceCustomer_SupplierConfirmed=Customer confirmed
+UpInvoiceCustomer_NoSuppliersFound=No third parties found
+UpInvoiceCustomer_SearchSupplier=Search customer
+UpInvoiceCustomer_ErrorConfirmingSupplier=Error confirming the customer
+UpInvoiceCustomer_NoSupplierSelected=No customer selected
+UpInvoiceCustomer_SupplierNotFound=Customer not found
+UpInvoiceCustomerRoleNotAllowed=You are not allowed to modify third parties, so this third party cannot be made a customer. Choose another one or ask for the permission.
+UpInvoiceSellPricesFilled=The catalogue sale price was proposed on %s lines that had no price. Check it before creating the order.
+UpInvoiceSellPrice=Sale price
+UpInvoiceNoSellPrice=No sale price
+UpInvoiceNextActionCustomer=Customer to be validated

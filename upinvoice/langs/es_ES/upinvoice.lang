@@ -480,3 +480,25 @@ UpInvoiceOrderAttachFailed=No se pudo adjuntar el PDF al pedido
 UpInvoiceOrderCreated=Pedido %s creado
 UpInvoiceOrderCreatedAndValidated=Pedido %s creado y validado
 UpInvoiceDocumentDate=Fecha del documento: %s
+
+# Customer orders (1.6.0)
+UpInvoiceCustomer_SupplierValidation=Validación del cliente
+UpInvoiceCustomer_DetectedSupplierData=Datos del cliente detectados
+UpInvoiceCustomer_SupplierInformation=Información del cliente
+UpInvoiceCustomer_FoundSuppliers=Terceros encontrados
+UpInvoiceCustomer_SelectThisSupplier=Seleccionar este cliente
+UpInvoiceCustomer_CreateNewSupplier=Crear nuevo cliente
+UpInvoiceCustomer_CreateSupplier=Crear cliente
+UpInvoiceCustomer_NoSupplierDataInJSON=No se encontraron datos de cliente en el documento
+UpInvoiceCustomer_ErrorCreatingSupplier=Error al crear el cliente
+UpInvoiceCustomer_SupplierConfirmed=Cliente confirmado
+UpInvoiceCustomer_NoSuppliersFound=No se encontraron terceros
+UpInvoiceCustomer_SearchSupplier=Buscar cliente
+UpInvoiceCustomer_ErrorConfirmingSupplier=Error al confirmar el cliente
+UpInvoiceCustomer_NoSupplierSelected=No se ha seleccionado ningún cliente
+UpInvoiceCustomer_SupplierNotFound=Cliente no encontrado
+UpInvoiceCustomerRoleNotAllowed=No tienes permiso para modificar terceros, así que este tercero no se puede marcar como cliente. Elige otro o pide el permiso.
+UpInvoiceSellPricesFilled=Se ha propuesto el precio de venta del catálogo en %s líneas que no traían precio. Revísalo antes de crear el pedido.
+UpInvoiceSellPrice=Precio de venta
+UpInvoiceNoSellPrice=Sin precio de venta
+UpInvoiceNextActionCustomer=Falta validar el cliente

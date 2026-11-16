@@ -61,6 +61,15 @@ if (!$user->rights->facture->lire) {
 
 // Initialize objects
 $upinvoicesupplier = new UpInvoiceSupplier($db);
+// Customer orders search customers (role of the file being reviewed)
+$roleFileId = GETPOSTINT('file_id');
+if ($roleFileId > 0) {
+    dol_include_once('/upinvoice/lib/upinvoice.lib.php');
+    $roleFile = new UpInvoiceFiles($db);
+    if (!UpInvoiceFiles::getMissingColumns($db) && $roleFile->fetch($roleFileId) > 0) {
+        $upinvoicesupplier->role = upinvoice_doc_type_role($roleFile->doc_type);
+    }
+}
 
 // Get search parameter
 $search_term = GETPOST('search_term', 'alpha');

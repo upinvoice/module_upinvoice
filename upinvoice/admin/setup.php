@@ -106,6 +106,29 @@ $formadmin = new FormAdmin($db);
 $formother = new FormOther($db);
 
 // Actions
+
+// On/off switches of the module: plain links (GET with token) instead of AJAX, handled here.
+// The AJAX switch of Dolibarr posts to core/ajax/constantonoff.php, which is refused when the
+// installation checks the Referer ($dolibarr_nocsrfcheck = 1) and the browser does not send it.
+$upinvoiceSwitches = array('UPINVOICE_SUPPLIER_ORDERS_ENABLED', 'UPINVOICE_CUSTOMER_ORDERS_ENABLED', 'UPINVOICE_EMAILCOLLECTOR_ENABLED', 'UPINVOICE_AUTO_AI_PROCESSING');
+if (preg_match('/^(set|del)_([A-Z0-9_]+)$/', $action, $switchMatch) && in_array($switchMatch[2], $upinvoiceSwitches, true)) {
+    // '0' instead of deleting: the constant keeps existing, like the module defaults
+    dolibarr_set_const($db, $switchMatch[2], $switchMatch[1] === 'set' ? '1' : '0', 'chaine', 0, '', $conf->entity);
+    header('Location: '.$_SERVER['PHP_SELF']);
+    exit;
+}
+
+/**
+ * On/off switch of a module constant, as a link handled by this page (see above)
+ *
+ * @param string $code Constant
+ * @return string      HTML
+ */
+function upinvoiceSwitch($code)
+{
+    global $conf;
+    return ajax_constantonoff($code, array(), $conf->entity, 0, 0, 0, 2, 1);
+}
 if ($action == 'update') {
     //$res = dolibarr_set_const($db, "UPINVOICE_API_URL", GETPOST("UPINVOICE_API_URL", 'alpha'), 'chaine', 0, '', $conf->entity);
     //if (!($res > 0)) $error++;
@@ -280,13 +303,14 @@ print '</tr>';
 $docTypeSetup = array(
     // doc_type => array(module search keyword for admin/modules.php)
     UpInvoiceFiles::DOC_SUPPLIER_ORDER => 'fournisseur',
+    UpInvoiceFiles::DOC_CUSTOMER_ORDER => 'commande',
 );
 $docTypeConstants = upinvoice_doc_type_constants();
 foreach ($docTypeSetup as $docType => $moduleKeyword) {
     print '<tr class="oddeven">';
     print '<td>' . $langs->trans(upinvoice_doc_type_label_key($docType)) . '</td>';
     if (upinvoice_doc_type_module_enabled($docType)) {
-        print '<td>' . ajax_constantonoff($docTypeConstants[$docType], array(), $conf->entity) . '</td>';
+        print '<td>' . upinvoiceSwitch($docTypeConstants[$docType]) . '</td>';
         print '<td>' . $langs->trans(upinvoice_doc_type_label_key($docType) . 'Help') . '</td>';
     } else {
         print '<td><span class="opacitymedium">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</span></td>';
@@ -301,7 +325,7 @@ print '</table>';
 
 print '<br>';
 
-// Email intake & automatic AI processing (toggles use ajax_constantonoff — no form needed)
+// Email intake & automatic AI processing (switches are links handled at the top of this page)
 print '<table class="noborder centpercent">';
 
 print '<tr class="liste_titre">';
@@ -314,7 +338,7 @@ print '</tr>';
 print '<tr class="oddeven">';
 print '<td>' . $langs->trans("UpInvoiceEmailCollectorEnabled") . '</td>';
 if (isModEnabled('emailcollector')) {
-    print '<td>' . ajax_constantonoff('UPINVOICE_EMAILCOLLECTOR_ENABLED', array(), $conf->entity) . '</td>';
+    print '<td>' . upinvoiceSwitch('UPINVOICE_EMAILCOLLECTOR_ENABLED') . '</td>';
     print '<td>' . $langs->trans("UpInvoiceEmailCollectorEnabledHelp") . '</td>';
 } else {
     print '<td><span class="opacitymedium">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</span></td>';
@@ -333,7 +357,7 @@ $intakeActive = isModEnabled('emailcollector') && getDolGlobalString('UPINVOICE_
 print '<tr class="oddeven">';
 print '<td>' . $langs->trans("UpInvoiceAutoAiProcessing") . '</td>';
 if ($intakeActive) {
-    print '<td>' . ajax_constantonoff('UPINVOICE_AUTO_AI_PROCESSING', array(), $conf->entity) . '</td>';
+    print '<td>' . upinvoiceSwitch('UPINVOICE_AUTO_AI_PROCESSING') . '</td>';
     print '<td>' . $langs->trans("UpInvoiceAutoAiProcessingHelp") . ' <a href="' . DOL_URL_ROOT . '/cron/list.php">' . $langs->trans("UpInvoiceSeeCronJobs") . '</a></td>';
 } else {
     print '<td><span class="opacitymedium">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</span></td>';

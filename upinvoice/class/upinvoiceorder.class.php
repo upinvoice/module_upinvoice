@@ -102,6 +102,57 @@ class UpInvoiceOrder
 	}
 
 	/**
+	 * Sale price of a product for a customer, as Dolibarr proposes it on an order line
+	 * (customer prices, price levels, default price)
+	 *
+	 * @param DoliDB  $db        Database handler
+	 * @param int     $productId Product
+	 * @param Societe $customer  Customer
+	 * @return array|null        array('pu_ht' => float, 'tva_tx' => float) or null
+	 */
+	public static function sellPrice($db, $productId, $customer)
+	{
+		global $mysoc;
+		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+		$product = new Product($db);
+		if ($product->fetch($productId) <= 0) {
+			return null;
+		}
+		$price = $product->getSellPrice($mysoc, $customer);
+		if (!is_array($price) || !isset($price['pu_ht'])) {
+			return array('pu_ht' => (float) $product->price, 'tva_tx' => (float) $product->tva_tx);
+		}
+		return array('pu_ht' => (float) price2num($price['pu_ht'], 'MU'), 'tva_tx' => (float) $price['tva_tx']);
+	}
+
+	/**
+	 * Customer orders often come without prices (notes, order forms): lines linked with a
+	 * product and without a price get the product sale price for this customer
+	 *
+	 * @param array   $lines    Lines (after product matching)
+	 * @param Societe $customer Customer
+	 * @param int     $filled   Number of lines that got a price
+	 * @return array            Lines
+	 */
+	public function fillMissingSellPrices(array $lines, $customer, &$filled = 0)
+	{
+		$filled = 0;
+		foreach ($lines as $i => $line) {
+			if (empty($line['fk_product']) || (float) ($line['pu_ht'] ?? 0) != 0.0) {
+				continue;
+			}
+			$price = self::sellPrice($this->db, (int) $line['fk_product'], $customer);
+			if ($price && $price['pu_ht'] > 0) {
+				$lines[$i]['pu_ht'] = $price['pu_ht'];
+				$lines[$i]['tva_tx'] = $price['tva_tx'];
+				$lines[$i]['price_from_catalog'] = true;
+				$filled++;
+			}
+		}
+		return $lines;
+	}
+
+	/**
 	 * Orders of the third party with the same reference (ref_supplier for supplier orders,
 	 * ref_client for customer orders): a warning before creating a duplicate
 	 *

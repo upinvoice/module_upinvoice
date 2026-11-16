@@ -480,3 +480,25 @@ UpInvoiceOrderAttachFailed=Das PDF konnte nicht an die Bestellung angehängt wer
 UpInvoiceOrderCreated=Bestellung %s angelegt
 UpInvoiceOrderCreatedAndValidated=Bestellung %s angelegt und freigegeben
 UpInvoiceDocumentDate=Dokumentdatum: %s
+
+# Customer orders (1.6.0)
+UpInvoiceCustomer_SupplierValidation=Kundenprüfung
+UpInvoiceCustomer_DetectedSupplierData=Erkannte Kundendaten
+UpInvoiceCustomer_SupplierInformation=Kundeninformationen
+UpInvoiceCustomer_FoundSuppliers=Gefundene Partner
+UpInvoiceCustomer_SelectThisSupplier=Diesen Kunden auswählen
+UpInvoiceCustomer_CreateNewSupplier=Neuen Kunden anlegen
+UpInvoiceCustomer_CreateSupplier=Kunden anlegen
+UpInvoiceCustomer_NoSupplierDataInJSON=Keine Kundendaten im Dokument gefunden
+UpInvoiceCustomer_ErrorCreatingSupplier=Fehler beim Anlegen des Kunden
+UpInvoiceCustomer_SupplierConfirmed=Kunde bestätigt
+UpInvoiceCustomer_NoSuppliersFound=Keine Partner gefunden
+UpInvoiceCustomer_SearchSupplier=Kunden suchen
+UpInvoiceCustomer_ErrorConfirmingSupplier=Fehler beim Bestätigen des Kunden
+UpInvoiceCustomer_NoSupplierSelected=Kein Kunde ausgewählt
+UpInvoiceCustomer_SupplierNotFound=Kunde nicht gefunden
+UpInvoiceCustomerRoleNotAllowed=Sie dürfen Partner nicht ändern, daher kann dieser Partner nicht zum Kunden gemacht werden. Wählen Sie einen anderen oder fordern Sie die Berechtigung an.
+UpInvoiceSellPricesFilled=Für %s Positionen ohne Preis wurde der Katalog-Verkaufspreis vorgeschlagen. Prüfen Sie ihn vor dem Anlegen der Bestellung.
+UpInvoiceSellPrice=Verkaufspreis
+UpInvoiceNoSellPrice=Kein Verkaufspreis
+UpInvoiceNextActionCustomer=Kunde muss geprüft werden

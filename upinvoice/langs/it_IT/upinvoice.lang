@@ -480,3 +480,25 @@ UpInvoiceOrderAttachFailed=Impossibile allegare il PDF all'ordine
 UpInvoiceOrderCreated=Ordine %s creato
 UpInvoiceOrderCreatedAndValidated=Ordine %s creato e convalidato
 UpInvoiceDocumentDate=Data del documento: %s
+
+# Customer orders (1.6.0)
+UpInvoiceCustomer_SupplierValidation=Verifica del cliente
+UpInvoiceCustomer_DetectedSupplierData=Dati del cliente rilevati
+UpInvoiceCustomer_SupplierInformation=Informazioni sul cliente
+UpInvoiceCustomer_FoundSuppliers=Soggetti trovati
+UpInvoiceCustomer_SelectThisSupplier=Seleziona questo cliente
+UpInvoiceCustomer_CreateNewSupplier=Crea nuovo cliente
+UpInvoiceCustomer_CreateSupplier=Crea cliente
+UpInvoiceCustomer_NoSupplierDataInJSON=Nessun dato del cliente trovato nel documento
+UpInvoiceCustomer_ErrorCreatingSupplier=Errore nella creazione del cliente
+UpInvoiceCustomer_SupplierConfirmed=Cliente confermato
+UpInvoiceCustomer_NoSuppliersFound=Nessun soggetto trovato
+UpInvoiceCustomer_SearchSupplier=Cerca cliente
+UpInvoiceCustomer_ErrorConfirmingSupplier=Errore nella conferma del cliente
+UpInvoiceCustomer_NoSupplierSelected=Nessun cliente selezionato
+UpInvoiceCustomer_SupplierNotFound=Cliente non trovato
+UpInvoiceCustomerRoleNotAllowed=Non hai il permesso di modificare i soggetti, quindi questo soggetto non può diventare cliente. Scegline un altro o chiedi il permesso.
+UpInvoiceSellPricesFilled=È stato proposto il prezzo di vendita del catalogo su %s righe senza prezzo. Controllalo prima di creare l'ordine.
+UpInvoiceSellPrice=Prezzo di vendita
+UpInvoiceNoSellPrice=Nessun prezzo di vendita
+UpInvoiceNextActionCustomer=Cliente da verificare

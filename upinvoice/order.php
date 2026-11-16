@@ -126,10 +126,17 @@ if ($thirdparty->fetch($upinvoicefiles->fk_supplier) <= 0) {
 // Lines linked with products: supplier codes of the supplier first (supplier orders), then ref > ref_ext > label
 if (!empty($order_data['lines']) && is_array($order_data['lines'])) {
     $productMatcher = new UpInvoiceProductMatcher($db);
-    $order_data['lines'] = $productMatcher->linkLines($order_data['lines'], $isCustomer ? 0 : (int) $thirdparty->id);
+    $order_data['lines'] = $isCustomer
+        ? $productMatcher->linkLines($order_data['lines'], 0, (int) $thirdparty->id)
+        : $productMatcher->linkLines($order_data['lines'], (int) $thirdparty->id);
 }
 
 $upinvoiceorder = new UpInvoiceOrder($db);
+// Customer orders without prices: linked products get their sale price for this customer
+$pricesFilled = 0;
+if ($isCustomer && !empty($order_data['lines']) && is_array($order_data['lines'])) {
+    $order_data['lines'] = $upinvoiceorder->fillMissingSellPrices($order_data['lines'], $thirdparty, $pricesFilled);
+}
 $payment_options = $upinvoiceorder->getPaymentOptions($docType, $thirdparty);
 $canValidate = UpInvoiceOrder::canValidateOnCreate($docType, $user);
 
@@ -301,6 +308,10 @@ print '<input type="hidden" name="file_id" value="'.$upinvoicefiles->id.'">';
 
 print '<div class="upinv-form">';
 
+if ($pricesFilled > 0) {
+    print '<div class="info"><i class="fas fa-tag"></i> '.$langs->trans('UpInvoiceSellPricesFilled', $pricesFilled).'</div>';
+}
+
 // Warnings that need a confirmation before creating the order
 if ($needsTypeConfirm || $needsCurrencyConfirm || $duplicates) {
     print '<div class="upinvoiceimport-warnings">';
@@ -400,8 +411,9 @@ print '</div>'; // container
 <script type="text/javascript">
     var upinvoiceimport_root = '<?php echo dirname($_SERVER['PHP_SELF']); ?>';
     var upinvoiceimport_token = '<?php echo newToken(); ?>';
-    // Product search shows purchase prices of this supplier (supplier orders); 0 for customer orders
-    var upinvoiceimport_socid = <?php echo $isCustomer ? 0 : (int) $thirdparty->id; ?>;
+    // Product search: purchase prices of this supplier (supplier orders) or sale prices for this customer
+    var upinvoiceimport_socid = <?php echo (int) $thirdparty->id; ?>;
+    var upinvoiceimport_price_mode = '<?php echo $isCustomer ? 'sell' : 'buy'; ?>';
     var upinvoiceimport_decimal_separator = '<?php echo dol_escape_js($langs->transnoentitiesnoconv("SeparatorDecimal")); ?>';
     var upinvoiceimport_langs = {
 <?php
@@ -412,8 +424,8 @@ $jsLangs = array();
 foreach ($jsLangKeys as $k) {
     $jsLangs[] = "        '".$k."': '".dol_escape_js($langs->trans($k))."'";
 }
-$jsLangs[] = "        'SupplierBuyPrice': '".dol_escape_js($langs->trans("UpInvoiceSupplierBuyPrice"))."'";
-$jsLangs[] = "        'NoSupplierPrice': '".dol_escape_js($langs->trans("UpInvoiceNoSupplierPrice"))."'";
+$jsLangs[] = "        'SupplierBuyPrice': '".dol_escape_js($langs->trans($isCustomer ? "UpInvoiceSellPrice" : "UpInvoiceSupplierBuyPrice"))."'";
+$jsLangs[] = "        'NoSupplierPrice': '".dol_escape_js($langs->trans($isCustomer ? "UpInvoiceNoSellPrice" : "UpInvoiceNoSupplierPrice"))."'";
 $jsLangs[] = "        'CostPrice': '".dol_escape_js($langs->trans("UpInvoiceCostPrice"))."'";
 $jsLangs[] = "        'ConfirmReplacePrice': '".dol_escape_js($langs->transnoentitiesnoconv("ConfirmReplacePrice"))."'";
 $jsLangs[] = "        'ConfirmReplaceVAT': '".dol_escape_js($langs->transnoentitiesnoconv("ConfirmReplaceVAT"))."'";

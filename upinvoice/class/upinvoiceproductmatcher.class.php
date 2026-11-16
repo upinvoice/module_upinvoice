@@ -7,6 +7,8 @@
  * Links document lines with Dolibarr products by the reference shown on the document.
  *
  * Same rule as the web (invoice.blade.php, findProductByRefs):
+ * 0. Customer orders: the reference the customer uses for the product (ref_customer of its
+ *    customer prices, Dolibarr 14+), only for that customer.
  * 1. Supplier codes first: the reference is compared with ref_fourn (the code this supplier uses
  *    for the product), only for the supplier of the document. References are tried in order.
  * 2. Then internal references: ref > ref_ext > label (inside a field, exact match before key match).
@@ -39,11 +41,13 @@ class UpInvoiceProductMatcher
      *
      * @param array $lines      Lines as returned by the API (product_ref, product_refs, product_type...)
      * @param int   $supplierId Supplier of the document; 0 or less skips the supplier code pass
+     * @param int   $customerId Customer of the document; 0 or less skips the customer reference pass
      * @return array            The same lines, the linked ones completed
      */
-    public function linkLines(array $lines, $supplierId)
+    public function linkLines(array $lines, $supplierId, $customerId = 0)
     {
         $supplierId = (int) $supplierId;
+        $customerId = (int) $customerId;
 
         foreach ($lines as $key => $line) {
             if (empty($line['product_ref'])) {
@@ -53,7 +57,13 @@ class UpInvoiceProductMatcher
             $refs = !empty($line['product_refs']) && is_array($line['product_refs']) ? $line['product_refs'] : array($line['product_ref']);
             $lineType = isset($line['product_type']) && $line['product_type'] !== '' ? (int) $line['product_type'] : null;
 
-            $product = $this->linkPass($refs, $lineType, 'supplier', $supplierId);
+            $product = null;
+            if ($customerId > 0) {
+                $product = $this->linkPass($refs, $lineType, 'customer', $customerId);
+            }
+            if (!$product && $supplierId > 0) {
+                $product = $this->linkPass($refs, $lineType, 'supplier', $supplierId);
+            }
             if (!$product) {
                 $product = $this->linkPass($refs, $lineType, 'internal', $supplierId);
             }
@@ -87,8 +97,8 @@ class UpInvoiceProductMatcher
      *
      * @param array    $refs       References of the line
      * @param int|null $lineType   Type given by the AI (0 product, 1 service) or null
-     * @param string   $pass       'supplier' (ref_fourn) or 'internal' (ref, ref_ext, label)
-     * @param int      $supplierId Supplier of the document
+     * @param string   $pass       'customer' (ref_customer), 'supplier' (ref_fourn) or 'internal' (ref, ref_ext, label)
+     * @param int      $supplierId Third party of the pass (customer or supplier)
      * @return object|null         Product row (rowid, ref, label, fk_product_type...) or null
      */
     private function linkPass($refs, $lineType, $pass, $supplierId)
@@ -99,7 +109,13 @@ class UpInvoiceProductMatcher
             if ($key === '') {
                 continue;
             }
-            $candidates = $pass === 'supplier' ? $this->supplierCandidates($ref, $key, $supplierId) : $this->internalCandidates($ref, $key);
+            if ($pass === 'customer') {
+                $candidates = $this->customerCandidates($ref, $key, $supplierId);
+            } elseif ($pass === 'supplier') {
+                $candidates = $this->supplierCandidates($ref, $key, $supplierId);
+            } else {
+                $candidates = $this->internalCandidates($ref, $key);
+            }
             $product = $this->pickUnique($candidates, $lineType);
             if ($product !== null) {
                 return $product;
@@ -200,6 +216,66 @@ class UpInvoiceProductMatcher
         $sql .= " ORDER BY p.rowid ASC";
         return $this->collect($sql, function ($obj) use ($ref, $key) {
             $value = (string) $obj->ref_fourn;
+            if ($value === '') {
+                return null;
+            }
+            if ($value === $ref) {
+                return 0;
+            }
+            return UpInvoiceProductMatcher::refKey($value) === $key ? 1 : null;
+        });
+    }
+
+    /** @var array|null Columns of llx_product_customer_price (ref_customer since Dolibarr 14, dates since 22) */
+    private static $customerPriceColumns = null;
+
+    /**
+     * Columns of llx_product_customer_price, or an empty array if the table does not exist
+     *
+     * @return string[]
+     */
+    private function customerPriceColumns()
+    {
+        if (self::$customerPriceColumns === null) {
+            self::$customerPriceColumns = array();
+            $info = $this->db->DDLInfoTable(MAIN_DB_PREFIX.'product_customer_price');
+            if (is_array($info)) {
+                foreach ($info as $col) {
+                    self::$customerPriceColumns[] = strtolower(is_array($col) ? reset($col) : $col);
+                }
+            }
+        }
+        return self::$customerPriceColumns;
+    }
+
+    /**
+     * Pass 0 candidates (customer orders): products whose reference for this customer
+     * (ref_customer of a customer price still valid today) matches the reference
+     *
+     * @param string $ref        Reference as printed
+     * @param string $key        refKey() of the reference
+     * @param int    $customerId Customer of the document
+     * @return array
+     */
+    private function customerCandidates($ref, $key, $customerId)
+    {
+        $columns = $this->customerPriceColumns();
+        $like = $this->likeOf($ref);
+        if ($customerId <= 0 || $like === '' || !in_array('ref_customer', $columns, true)) {
+            return array();
+        }
+        $sql = "SELECT p.rowid, p.ref, p.ref_ext, p.label, p.description, p.price, p.price_ttc, p.tva_tx, p.fk_product_type, pcp.ref_customer";
+        $sql .= " FROM ".MAIN_DB_PREFIX."product_customer_price as pcp";
+        $sql .= " INNER JOIN ".MAIN_DB_PREFIX."product as p ON p.rowid = pcp.fk_product";
+        $sql .= " WHERE pcp.fk_soc = ".((int) $customerId)." AND pcp.ref_customer LIKE '%".$like."%'";
+        if (in_array('date_begin', $columns, true) && in_array('date_end', $columns, true)) {
+            $now = "'".$this->db->idate(dol_now())."'";
+            $sql .= " AND (pcp.date_begin IS NULL OR pcp.date_begin <= ".$now.") AND (pcp.date_end IS NULL OR pcp.date_end >= ".$now.")";
+        }
+        $sql .= " AND p.entity IN (".getEntity('product').")";
+        $sql .= " ORDER BY p.rowid ASC";
+        return $this->collect($sql, function ($obj) use ($ref, $key) {
+            $value = (string) $obj->ref_customer;
             if ($value === '') {
                 return null;
             }

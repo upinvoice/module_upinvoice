@@ -81,6 +81,8 @@ var UpInvoiceProductSelector = {
                         search: params.term,
                         type: $('#line_type_' + lineNum).val() || '-1', // Get the current product type value
                         socid: upinvoiceimport_socid, // Purchase prices are those of the invoice supplier
+                        // 'sell' on customer orders: sale prices for the customer instead of purchase prices
+                        price_mode: (typeof upinvoiceimport_price_mode !== 'undefined') ? upinvoiceimport_price_mode : 'buy',
                         token: upinvoiceimport_token
                     };
                 },

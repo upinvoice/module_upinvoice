@@ -64,7 +64,8 @@ $token = GETPOST('token', 'alpha');
 $search = GETPOST('search', 'alpha');
 $product_type = GETPOST('type', 'int'); // 0 = product, 1 = service, -1 = both
 $limit = GETPOST('limit', 'int') ?: 10;
-$socid = GETPOST('socid', 'int'); // Supplier of the invoice being imported
+$socid = GETPOST('socid', 'int'); // Supplier of the invoice being imported (customer on customer orders)
+$priceMode = GETPOST('price_mode', 'aZ09') === 'sell' ? 'sell' : 'buy';
 
 // CSRF protection
 if (!verifyCsrf()) {
@@ -80,7 +81,7 @@ if (empty($search)) {
 }
 
 // Search for products
-$result = searchProducts($search, $product_type, $limit, $socid);
+$result = searchProducts($search, $product_type, $limit, $socid, $priceMode);
 
 // Return JSON response
 header('Content-Type: application/json');
@@ -95,7 +96,7 @@ echo json_encode($result);
  * @param int $socid Supplier whose purchase prices are returned (0 = none)
  * @return array Search results
  */
-function searchProducts($search, $product_type = -1, $limit = 10, $socid = 0)
+function searchProducts($search, $product_type = -1, $limit = 10, $socid = 0, $priceMode = 'buy')
 {
     global $db, $conf, $langs;
     
@@ -167,7 +168,8 @@ function searchProducts($search, $product_type = -1, $limit = 10, $socid = 0)
 
     // This is a supplier invoice: prices and VAT must come from what this supplier charges us
     // (product_fournisseur_price), never from the sale price of the product
-    $supplierPrices = getSupplierPrices(array_keys($rows), $socid);
+    // Customer orders: the sale price for the customer, returned in the same fields as the purchase price
+    $supplierPrices = ($priceMode === 'sell') ? getSellPrices(array_keys($rows), $socid) : getSupplierPrices(array_keys($rows), $socid);
 
     // Parse results
     foreach ($rows as $id => $obj) {
@@ -251,3 +253,33 @@ function verifyCsrf()
     
     return true;
 }
+
+/**
+ * Sale price of each product for a customer (same shape as getSupplierPrices())
+ *
+ * @param int[] $productIds Product IDs
+ * @param int   $socid      Customer ID
+ * @return array            object(unitprice, tva_tx, ref_fourn='') indexed by product ID
+ */
+function getSellPrices($productIds, $socid)
+{
+    global $db;
+    $prices = array();
+    if (empty($productIds) || $socid <= 0) {
+        return $prices;
+    }
+    require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+    dol_include_once('/upinvoice/class/upinvoiceorder.class.php');
+    $customer = new Societe($db);
+    if ($customer->fetch($socid) <= 0) {
+        return $prices;
+    }
+    foreach ($productIds as $id) {
+        $price = UpInvoiceOrder::sellPrice($db, $id, $customer);
+        if ($price) {
+            $prices[(int) $id] = (object) array('unitprice' => $price['pu_ht'], 'tva_tx' => $price['tva_tx'], 'ref_fourn' => '');
+        }
+    }
+    return $prices;
+}
+

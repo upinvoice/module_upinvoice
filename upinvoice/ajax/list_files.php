@@ -285,7 +285,7 @@ if (count($files) == 0) {
             if (!empty($file->fk_supplier) && empty($file->fk_invoice)) {
                 $nextAction = $langs->trans($isOrderType ? 'NextActionOrder' : 'NextActionInvoice');
             } elseif ($cardState === 'processed' && $file->import_step > 1 && empty($file->fk_supplier)) {
-                $nextAction = $langs->trans('NextActionSupplier');
+                $nextAction = $langs->trans($docType === UpInvoiceFiles::DOC_CUSTOMER_ORDER ? 'UpInvoiceNextActionCustomer' : 'NextActionSupplier');
             } elseif ($cardState === 'pending' || $cardState === 'stuck') {
                 $nextAction = $langs->trans('NextActionProcess');
             }

@@ -480,3 +480,25 @@ UpInvoiceOrderAttachFailed=Le PDF n'a pas pu être joint à la commande
 UpInvoiceOrderCreated=Commande %s créée
 UpInvoiceOrderCreatedAndValidated=Commande %s créée et validée
 UpInvoiceDocumentDate=Date du document : %s
+
+# Customer orders (1.6.0)
+UpInvoiceCustomer_SupplierValidation=Validation du client
+UpInvoiceCustomer_DetectedSupplierData=Données du client détectées
+UpInvoiceCustomer_SupplierInformation=Informations du client
+UpInvoiceCustomer_FoundSuppliers=Tiers trouvés
+UpInvoiceCustomer_SelectThisSupplier=Sélectionner ce client
+UpInvoiceCustomer_CreateNewSupplier=Créer un nouveau client
+UpInvoiceCustomer_CreateSupplier=Créer le client
+UpInvoiceCustomer_NoSupplierDataInJSON=Aucune donnée client trouvée dans le document
+UpInvoiceCustomer_ErrorCreatingSupplier=Erreur lors de la création du client
+UpInvoiceCustomer_SupplierConfirmed=Client confirmé
+UpInvoiceCustomer_NoSuppliersFound=Aucun tiers trouvé
+UpInvoiceCustomer_SearchSupplier=Rechercher un client
+UpInvoiceCustomer_ErrorConfirmingSupplier=Erreur lors de la confirmation du client
+UpInvoiceCustomer_NoSupplierSelected=Aucun client sélectionné
+UpInvoiceCustomer_SupplierNotFound=Client introuvable
+UpInvoiceCustomerRoleNotAllowed=Vous n'avez pas le droit de modifier les tiers : ce tiers ne peut pas devenir client. Choisissez-en un autre ou demandez le droit.
+UpInvoiceSellPricesFilled=Le prix de vente du catalogue a été proposé sur %s lignes sans prix. Vérifiez-le avant de créer la commande.
+UpInvoiceSellPrice=Prix de vente
+UpInvoiceNoSellPrice=Pas de prix de vente
+UpInvoiceNextActionCustomer=Client à valider

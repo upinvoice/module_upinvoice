@@ -25,6 +25,65 @@ class UpInvoiceSupplier
     {
         $this->db = $db;
     }
+
+    /**
+     * Role of the third party of the document: 'supplier' (invoices and supplier orders, default)
+     * or 'customer' (customer orders). Suppliers are searched among suppliers only, as always;
+     * customers among all third parties (customers first), so that a company that is only a
+     * supplier is found instead of created twice; the customer role is added when it is chosen.
+     *
+     * @var string
+     */
+    public $role = 'supplier';
+
+    /**
+     * SQL condition and order of the search for the current role
+     *
+     * @return array array(where, orderby)
+     */
+    private function roleSql()
+    {
+        if ($this->role === 'customer') {
+            return array(
+                " WHERE entity IN (".getEntity('societe').")",
+                " ORDER BY (client IN (1, 3)) DESC, rowid ASC",
+            );
+        }
+        return array(" WHERE fournisseur = 1", ""); // Must be a supplier
+    }
+
+    /**
+     * Make an existing third party a customer (client=1 or 3 if prospect... keeps the supplier flag)
+     * with the next customer code. Only the role and the code are changed.
+     *
+     * @param int  $socid Third party
+     * @param User $user  User (needs to be allowed to modify third parties)
+     * @return int        1 already customer or done, 0 not allowed, <0 error
+     */
+    public function ensureCustomerRole($socid, $user)
+    {
+        $soc = new Societe($this->db);
+        if ($soc->fetch($socid) <= 0) {
+            return -1;
+        }
+        if (in_array((int) $soc->client, array(1, 3), true)) {
+            return 1;
+        }
+        if (!$user->hasRight('societe', 'creer')) {
+            return 0;
+        }
+        // 2 = prospect: becomes prospect + customer (3); else customer (1)
+        $soc->client = ((int) $soc->client === 2) ? 3 : 1;
+        if (empty($soc->code_client)) {
+            $soc->code_client = 'auto';
+        }
+        $result = $soc->update($soc->id, $user, 1, 1, 0, 'update'); // allowmodcodeclient=1: the generated customer code is saved
+        if ($result < 0) {
+            $this->error = $soc->error;
+            return -2;
+        }
+        return 1;
+    }
     
     /**
      * Search suppliers by tax ID (siren, siret, tva_intra)
@@ -43,8 +102,9 @@ class UpInvoiceSupplier
         
         $suppliers = array();
         
+        list($roleWhere, $roleOrder) = $this->roleSql();
         $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."societe";
-        $sql .= " WHERE fournisseur = 1"; // Must be a supplier
+        $sql .= $roleWhere;
         $sql .= " AND (";
         
         // Search in various ID fields (remove non-numeric chars for comparison)
@@ -56,6 +116,7 @@ class UpInvoiceSupplier
         $sql .= " OR REPLACE(REPLACE(REPLACE(idprof6, ' ', ''), '-', ''), '.', '') LIKE '%" . $this->db->escape($cleanTaxId) . "%'";
         $sql .= " OR REPLACE(REPLACE(REPLACE(ape, ' ', ''), '-', ''), '.', '') LIKE '%" . $this->db->escape($cleanTaxId) . "%'";
         $sql .= ")";
+        $sql .= $roleOrder;
         
         $resql = $this->db->query($sql);
         if (!$resql) {
@@ -94,8 +155,9 @@ class UpInvoiceSupplier
             return array();
         }
         
+        list($roleWhere, $roleOrder) = $this->roleSql();
         $sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."societe";
-        $sql .= " WHERE fournisseur = 1"; // Must be a supplier
+        $sql .= $roleWhere;
         
         // Search for each keyword with AND condition
         foreach ($keywords as $keyword) {
@@ -106,6 +168,7 @@ class UpInvoiceSupplier
                 $sql .= ")";
             }
         }
+        $sql .= $roleOrder;
         
         $resql = $this->db->query($sql);
         if (!$resql) {
@@ -192,9 +255,16 @@ class UpInvoiceSupplier
             $supplier->zip = !empty($data['zip']) ? $data['zip'] : null;
             $supplier->town = !empty($data['town']) ? $data['town'] : null;
             
-            // Es proveedor por defecto
-            $supplier->fournisseur = 1;
-            $supplier->code_fournisseur = 'auto';//$this->getNextSupplierCode();
+            if ($this->role === 'customer') {
+                // Customer of a customer order (not a supplier)
+                $supplier->fournisseur = 0;
+                $supplier->client = 1;
+                $supplier->code_client = 'auto';
+            } else {
+                // Es proveedor por defecto
+                $supplier->fournisseur = 1;
+                $supplier->code_fournisseur = 'auto';//$this->getNextSupplierCode();
+            }
             
             // Información fiscal
             // supplier.php envía 'tva_intra'; 'vat_number' se mantiene por compatibilidad
@@ -247,8 +317,17 @@ class UpInvoiceSupplier
             // Estado
             $supplier->status = isset($data['status']) ? $data['status'] : 1; // Activo por defecto
             
-            // No es cliente por defecto
-            $supplier->client = 0;
+            // No es cliente por defecto (salvo en pedidos de cliente)
+            if ($this->role !== 'customer') {
+                $supplier->client = 0;
+            }
+            // Private person (customer orders): third party type "Particular"
+            if (!empty($data['is_individual']) && empty($data['typent_id'])) {
+                $typentId = dol_getIdFromCode($db, 'TE_PRIVATE', 'c_typent', 'code', 'id');
+                if ($typentId > 0) {
+                    $supplier->typent_id = $typentId;
+                }
+            }
             
             // Incoterms si está habilitado
             if (isModEnabled('incoterm') && !empty($data['incoterm_id'])) {
@@ -276,7 +355,7 @@ class UpInvoiceSupplier
             
             // Asociar categorías de proveedor
             if (!empty($data['categories']) && isModEnabled('category')) {
-                $supplier->setCategories($data['categories'], 'supplier');
+                $supplier->setCategories($data['categories'], $this->role === 'customer' ? 'customer' : 'supplier');
             }
             
             // Asociar representante comercial

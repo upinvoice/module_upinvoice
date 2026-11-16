@@ -35,7 +35,7 @@ class modUpInvoice extends DolibarrModules
         $this->descriptionlong = "This module allows to upload, validate and register supplier invoices in a three steps process";
         $this->editor_name = "UpInvoice.eu";
         $this->editor_url = "https://upinvoice.eu";
-        $this->version = '1.5.0';
+        $this->version = '1.6.0';
         $this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
         $this->picto = 'bill';
 
@@ -101,6 +101,15 @@ class modUpInvoice extends DolibarrModules
                 'chaine',
                 '0',
                 'Import supplier orders (purchase orders) from PDF',
+                0,
+                'current',
+                0
+            ),
+            6 => array(
+                'UPINVOICE_CUSTOMER_ORDERS_ENABLED',
+                'chaine',
+                '0',
+                'Import customer orders from PDF or photo',
                 0,
                 'current',
                 0
@@ -181,6 +190,24 @@ class modUpInvoice extends DolibarrModules
             'position' => 450,
             'enabled' => 'isModEnabled("upinvoice") && isModEnabled("supplier_order") && getDolGlobalInt("UPINVOICE_SUPPLIER_ORDERS_ENABLED")',
             'perms' => '$user->hasRight("fournisseur", "commande", "creer") || $user->hasRight("supplier_order", "creer")',
+            'target' => '',
+            'user' => 0
+        );
+        $r++;
+
+        // Customer orders: entry under Commercial > Customer orders (when enabled in the module setup)
+        $this->menu[$r] = array(
+            'fk_menu' => 'fk_mainmenu=commercial,fk_leftmenu=orders',
+            'type' => 'left',
+            'titre' => 'UpInvoice',
+            'prefix' => img_picto('', 'fa-cloud-upload-alt', 'class="fa-fw pictofixedwidth"'),
+            'mainmenu' => 'commercial',
+            'leftmenu' => 'upinvoice_customer_orders',
+            'url' => '/upinvoice/upload.php?doc_type=customer_order',
+            'langs' => 'upinvoice@upinvoice',
+            'position' => 250,
+            'enabled' => 'isModEnabled("upinvoice") && (isModEnabled("commande") || isModEnabled("order")) && getDolGlobalInt("UPINVOICE_CUSTOMER_ORDERS_ENABLED")',
+            'perms' => '$user->hasRight("commande", "creer")',
             'target' => '',
             'user' => 0
         );

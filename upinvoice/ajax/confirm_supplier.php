@@ -109,6 +109,16 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit;
 }
 
+// Customer orders: the chosen third party must be (or become) a customer
+if (upinvoice_doc_type_role($upinvoicefiles->doc_type) === 'customer') {
+    dol_include_once('/upinvoice/class/upinvoicesupplier.class.php');
+    $roleHelper = new UpInvoiceSupplier($db);
+    if ($roleHelper->ensureCustomerRole($supplierId, $user) <= 0) {
+        echo json_encode(array('status' => 'error', 'message' => $langs->trans('UpInvoiceCustomerRoleNotAllowed')));
+        exit;
+    }
+}
+
 // Update JSON data to include supplier ID
 $tpKey = UpInvoiceFiles::thirdpartyKey($invoice_data);
 if (is_array($invoice_data) && isset($invoice_data[$tpKey])) {

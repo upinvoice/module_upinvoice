@@ -198,3 +198,32 @@ function upinvoice_requested_doc_type($user)
 	$docType = GETPOST('doc_type', 'aZ09');
 	return in_array($docType, upinvoice_available_doc_types($user), true) ? $docType : UpInvoiceFiles::DOC_SUPPLIER_INVOICE;
 }
+
+/**
+ * Role of the third party of a document type: 'customer' for customer orders, else 'supplier'
+ *
+ * @param string $docType Document type
+ * @return string
+ */
+function upinvoice_doc_type_role($docType)
+{
+	return $docType === UpInvoiceFiles::DOC_CUSTOMER_ORDER ? 'customer' : 'supplier';
+}
+
+/**
+ * Customer orders: the third party pages say "customer" instead of "supplier". The texts of
+ * those pages are replaced by their customer variant (UpInvoiceCustomer_<key>), so the
+ * supplier wording of invoices is left untouched.
+ *
+ * @param Translate $langs Translations (upinvoice@upinvoice loaded)
+ * @return void
+ */
+function upinvoice_use_customer_wording($langs)
+{
+	foreach (array('SupplierValidation', 'DetectedSupplierData', 'SupplierInformation', 'FoundSuppliers', 'SelectThisSupplier', 'CreateNewSupplier', 'CreateSupplier', 'NoSupplierDataInJSON', 'ErrorCreatingSupplier', 'SupplierConfirmed', 'NoSuppliersFound', 'SearchSupplier', 'ErrorConfirmingSupplier', 'NoSupplierSelected', 'SupplierNotFound') as $key) {
+		$customerKey = 'UpInvoiceCustomer_'.$key;
+		if ($langs->trans($customerKey) !== $customerKey) {
+			$langs->tab_translate[$key] = $langs->tab_translate[$customerKey];
+		}
+	}
+}

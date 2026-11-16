@@ -24,7 +24,8 @@ $(document).ready(function() {
             type: 'GET',
             data: {
                 token: upinvoiceimport_token,
-                search_term: searchTerm
+                search_term: searchTerm,
+                file_id: $('#file_id').val() // customer orders search customers
             },
             success: function(response) {
                 try {

@@ -1,3 +1,13 @@
+1.6.0 (2026-11-16)
+- New: customer orders. Enable "Customer orders" in the module setup (it needs the Dolibarr orders module) and a "Customer orders" tab appears on the upload page; there is also an UpInvoice entry in the Commercial > Customer orders menu
+- Works with the customer's purchase order, your own order form or confirmation, handwritten notes and photos: the customer, its reference (ref_client), dates, delivery instructions (public note) and lines are read. Orders without prices are created with price 0; lines linked to a product get its sale price for that customer, to be checked before creating
+- The customer step searches all third parties (customers first): a company that is only a supplier is found instead of created twice, and becomes a customer when chosen (with its customer code; this needs the permission to modify third parties). New customers without a company name or tax ID are created as private persons
+- Product matching also uses the reference the customer gives to the product (customer prices, Dolibarr 14+), then ref, ref_ext and label. The manual product search shows sale prices instead of purchase prices
+- "Create and validate" is disabled when validating a customer order would move the stock (it needs a warehouse): validate it from the order card
+- The on/off switches of the module setup (supplier orders, customer orders, email intake, automatic AI processing) are saved also on Dolibarr installations that check the Referer of forms ($dolibarr_nocsrfcheck = 1 in conf.php) when the browser does not send it: they are links handled by the setup page instead of AJAX calls, which Dolibarr refuses there ("Access refused by CSRF protection")
+- Supplier invoices and supplier orders work as before
+- Update: disable and enable the module again after updating, to add the new menu entry
+
 1.5.0 (2026-11-16)
 - New: supplier orders. Enable "Supplier orders" in the module setup (it needs the Dolibarr supplier orders module) and a "Supplier orders" tab appears next to "Supplier invoices" on the upload page, with the credits bar on the same row (credits are shared by all document types). There is also an UpInvoice entry in the Commercial > Supplier orders menu
 - A supplier order PDF can be your own purchase order or the supplier's order confirmation: the supplier, its reference, the order date, the expected delivery date, notes and lines are read from it. When your company issued the document, its number is kept in the private note

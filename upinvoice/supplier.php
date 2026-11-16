@@ -107,6 +107,12 @@ dol_include_once('/upinvoice/lib/upinvoice.lib.php');
 $tpKey = UpInvoiceFiles::thirdpartyKey($invoice_data);
 $reviewPage = upinvoice_doc_type_review_page($upinvoicefiles->doc_type);
 $supplier_data = isset($invoice_data[$tpKey]) ? $invoice_data[$tpKey] : array();
+// Customer orders: search / create customers, and say "customer" on the page
+$thirdpartyRole = upinvoice_doc_type_role($upinvoicefiles->doc_type);
+$upinvoicesupplier->role = $thirdpartyRole;
+if ($thirdpartyRole === 'customer') {
+    upinvoice_use_customer_wording($langs);
+}
 if (empty($supplier_data) || empty($supplier_data['name'])) {
     setEventMessages($langs->trans("NoSupplierDataInJSON"), null, 'errors');
     header("Location: ".dol_buildpath('/upinvoice/upload.php', 1));
@@ -119,6 +125,11 @@ $supplierId = GETPOST('supplier_id', 'int');
 $searchResults = array();
 
 // Actions handling
+if ($action == 'confirm_supplier' && !empty($supplierId) && $thirdpartyRole === 'customer' && $upinvoicesupplier->ensureCustomerRole($supplierId, $user) <= 0) {
+    // The chosen third party is not a customer yet and the user cannot make it one
+    setEventMessages($langs->trans('UpInvoiceCustomerRoleNotAllowed'), null, 'errors');
+    $action = 'view';
+}
 if ($action == 'confirm_supplier' && !empty($supplierId)) {
     // Update JSON data to include supplier ID
     $invoice_data = json_decode($upinvoicefiles->api_json, true);
@@ -152,7 +163,8 @@ if ($action == 'confirm_supplier' && !empty($supplierId)) {
         'idprof1' => GETPOST('idprof1', 'alpha'),
         'tva_intra' => GETPOST('tva_intra', 'alpha'),
         'phone' => GETPOST('phone', 'alpha'),
-        'email' => GETPOST('email', 'alpha')
+        'email' => GETPOST('email', 'alpha'),
+        'is_individual' => GETPOSTINT('is_individual')
     );
     
     // Create supplier
@@ -373,6 +385,7 @@ print '<h2>' . $langs->trans("CreateNewSupplier") . '</h2>';
 print '<form method="POST" action="' . $_SERVER['PHP_SELF'] . '">';
 print '<input type="hidden" name="token" value="' . newToken() . '">';
 print '<input type="hidden" name="action" value="create_supplier">';
+print '<input type="hidden" name="is_individual" value="' . (!empty($supplier_data['is_individual']) ? 1 : 0) . '">';
 print '<input type="hidden" name="file_id" value="' . $upinvoicefiles->id . '">';
 
 // Pre-fill form with data from JSON (2-column compact grid)
