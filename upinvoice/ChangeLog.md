@@ -1,3 +1,6 @@
+1.4.9 (2026-11-16)
+- Internal: product matching by reference moved to a class (UpInvoiceProductMatcher), and the lines table with its totals script to tpl/lines_form.tpl.php and js/upinvoice-lines.js, to share them with orders. No change in behaviour: same products linked and same page for invoices
+
 1.4.8 (2026-11-16)
 - Fix: the intra-community VAT number typed or detected when creating a new supplier was not saved on the supplier
 - Fix: the company VAT number sent to the UpInvoice API always kept its country prefix (e.g. "ESB12345678"); it is now sent without it ("B12345678"), as intended
