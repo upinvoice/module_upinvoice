@@ -275,7 +275,7 @@ if ($thirdpartyIsOwnCompany) {
     print '<div class="warning"><i class="fas fa-exclamation-triangle"></i> '.$langs->trans('UpInvoiceThirdpartyIsOwnCompany').'</div>';
 }
 
-$previewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
+$previewUrl = upinvoice_file_preview_url($upinvoicefiles);
 $isPdfDoc = (strpos((string) $upinvoicefiles->file_type, 'pdf') !== false);
 
 print '<div class="upinvoiceimport-container">';

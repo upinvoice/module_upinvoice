@@ -1,3 +1,7 @@
+1.6.1 (2026-11-19)
+- Fix: users who are not Dolibarr administrators saw an empty document viewer (PDF or image) on the review pages and in the file previews, even with every permission. The documents are now served by the module with its own rules (read invoices permission, or the permission to create the order for order files), the same as its pages
+- No setup change is needed: just replace the module files
+
 1.6.0 (2026-11-16)
 - New: customer orders. Enable "Customer orders" in the module setup (it needs the Dolibarr orders module) and a "Customer orders" tab appears on the upload page; there is also an UpInvoice entry in the Commercial > Customer orders menu
 - Works with the customer's purchase order, your own order form or confirmation, handwritten notes and photos: the customer, its reference (ref_client), dates, delivery instructions (public note) and lines are read. Orders without prices are created with price 0; lines linked to a product get its sale price for that customer, to be checked before creating

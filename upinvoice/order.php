@@ -270,7 +270,7 @@ $valNotePublic = $posted ? GETPOST('note_public', 'restricthtml') : (string) ($o
 $valNotePrivate = $posted ? GETPOST('note_private', 'restricthtml') : $defaultNotePrivate;
 
 print '<div class="upinvoiceimport-container">';
-$previewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
+$previewUrl = upinvoice_file_preview_url($upinvoicefiles);
 $isPdfDoc = (strpos((string) $upinvoicefiles->file_type, 'pdf') !== false);
 
 print '<div class="upinv-split">';

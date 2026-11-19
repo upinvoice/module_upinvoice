@@ -227,12 +227,12 @@ if (count($files) == 0) {
 
             // File thumbnail
             $html .= '<div class="file-thumbnail" role="button" tabindex="0" aria-label="' . dol_escape_htmltag($langs->trans('FilePreview')) . '" data-file-id="' . $file->id . '" data-file-name="' . dol_escape_htmltag($file->original_filename) . '"
-                     data-file-type="' . dol_escape_htmltag($file->file_type) . '" data-file-path="' . dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($file->file_path)).'&cache=0' . '">';
+                     data-file-type="' . dol_escape_htmltag($file->file_type) . '" data-file-path="' . upinvoice_file_preview_url($file) . '">';
             
             if (strpos($file->file_type, 'pdf') !== false) {
                 $html .= '<i class="fas fa-file-pdf fa-2x"></i>';
             } elseif (strpos($file->file_type, 'image') !== false) {
-                $html .= '<img src="' . dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($file->file_path)).'&cache=0' . '" alt="' . dol_escape_htmltag($file->original_filename) . '">';
+                $html .= '<img src="' . upinvoice_file_preview_url($file) . '" alt="' . dol_escape_htmltag($file->original_filename) . '">';
             } else {
                 $html .= '<i class="fas fa-file fa-2x"></i>';
             }
@@ -398,7 +398,7 @@ if (count($files) == 0) {
                 $html .= '<i class="fas fa-file" style="margin-right: 5px;"></i>';
             }
             $html .= '<a href="' . upinvoice_object_card_url($file->doc_type, $file->fk_invoice) . '" class="file-thumbnail-name" data-file-id="' . $file->id . '" data-file-name="' . dol_escape_htmltag($file->original_filename) . '" ';
-            $html .= 'data-file-type="' . dol_escape_htmltag($file->file_type) . '" data-file-path="' . dol_buildpath('/viewimage.php', 1) . '?modulepart=upinvoice&file=temp/' . urlencode(basename($file->file_path)) . '&cache=0">';
+            $html .= 'data-file-type="' . dol_escape_htmltag($file->file_type) . '" data-file-path="' . upinvoice_file_preview_url($file) . '">';
             $html .= dol_escape_htmltag($file->original_filename);
             $html .= '</a>';
             if (!empty($file->import_rule_label)) {

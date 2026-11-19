@@ -304,7 +304,7 @@ class UpInvoiceFiles extends CommonObject
      */
     public function fetch($id)
     {
-        $sql = "SELECT rowid, file_path, original_filename, file_size, file_type, api_json,";
+        $sql = "SELECT rowid, entity, file_path, original_filename, file_size, file_type, api_json,";
         $sql .= " date_creation, fk_user_creat, date_modification, fk_user_modif,";
         $sql .= " import_step, fk_supplier, fk_invoice, status, processing, import_error, ai_retries, source, file_hash, import_rule_label, calc_method, doc_type,";
         $sql .= " processing_token, processing_started, idempotency_key";
@@ -317,6 +317,7 @@ class UpInvoiceFiles extends CommonObject
                 $obj = $this->db->fetch_object($resql);
                 
                 $this->id = $obj->rowid;
+                $this->entity = (int) $obj->entity;
                 $this->file_path = $obj->file_path;
                 $this->original_filename = $obj->original_filename;
                 $this->file_size = $obj->file_size;

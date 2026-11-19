@@ -66,6 +66,35 @@ function upinvoice_user_can_create($user, $docType)
 }
 
 /**
+ * Can the user see the uploaded document of an UpInvoice file (preview in viewfile.php)?
+ * Same rules as the module pages: the import queue (upload.php, invoice.php) needs the invoice read
+ * right, the order review page needs the right to create that order.
+ *
+ * @param User           $user User
+ * @param UpInvoiceFiles $file File record
+ * @return bool
+ */
+function upinvoice_user_can_view_file($user, $file)
+{
+	if (!empty($user->rights->facture->lire)) {
+		return true;
+	}
+	return $file->isOrder() && upinvoice_user_can_create($user, $file->doc_type);
+}
+
+/**
+ * URL of the preview of an UpInvoice file (served by viewfile.php with the module rights,
+ * since viewimage.php?modulepart=upinvoice only lets admins in)
+ *
+ * @param UpInvoiceFiles|object $file File record (needs id)
+ * @return string
+ */
+function upinvoice_file_preview_url($file)
+{
+	return dol_buildpath('/upinvoice/viewfile.php', 1).'?id='.((int) $file->id);
+}
+
+/**
  * Remember the document types announced by the UpInvoice API (/api/check)
  *
  * @param string[] $docTypes Document types

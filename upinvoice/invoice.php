@@ -46,6 +46,7 @@ require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 require_once './class/upinvoicefiles.class.php';
 require_once './class/upinvoiceinvoice.class.php';
 require_once './class/upinvoiceproductmatcher.class.php';
+dol_include_once('/upinvoice/lib/upinvoice.lib.php');
 
 // Control access
 if (!$user->rights->facture->lire) accessforbidden();
@@ -278,7 +279,7 @@ print load_fiche_titre($langs->trans($page_name), '', 'title_accountancy');
 // Display current file and supplier info
 print '<div class="upinvoiceimport-container">';
 
-$previewUrl = dol_buildpath('/viewimage.php', 1).'?modulepart=upinvoice&file=temp/'.urlencode(basename($upinvoicefiles->file_path)).'&cache=0';
+$previewUrl = upinvoice_file_preview_url($upinvoicefiles);
 $isPdfDoc = (strpos((string) $upinvoicefiles->file_type, 'pdf') !== false);
 
 // Two-column split: document viewer (left) + form (right)
